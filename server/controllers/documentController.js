@@ -67,8 +67,8 @@ exports.uploadDocument = (req, res) => {
     const storedFilename = req.file.filename;
     const fileSize = req.file.size || 0;
 
-    let fileBase64 = "";
-    if (req.file.path && fs.existsSync(req.file.path)) {
+    let fileBase64 = null;
+    if (req.file.path && fs.existsSync(req.file.path) && fileSize <= 15 * 1024 * 1024) {
         try {
             fileBase64 = fs.readFileSync(req.file.path).toString("base64");
         } catch (e) {
@@ -76,13 +76,29 @@ exports.uploadDocument = (req, res) => {
         }
     }
 
-    db.run(
-        `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBase64],
-        function (err) {
+    const insertWithFallback = (includeBase64) => {
+        const query = includeBase64
+            ? `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            : `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+               VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
+
+        const params = includeBase64
+            ? [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBase64]
+            : [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
+
+        db.run(query, params, function (err) {
             if (err) {
+                if (includeBase64 && fileBase64) {
+                    console.warn("Base64 DB insert failed, retrying without base64 payload:", err.message);
+                    return insertWithFallback(false);
+                }
+
                 console.error("Database Insert Error:", err.message);
+                // Clean up file from disk if database insert failed completely
+                if (req.file.path && fs.existsSync(req.file.path)) {
+                    try { fs.unlinkSync(req.file.path); } catch (u) {}
+                }
                 return res.status(500).json({
                     success: false,
                     message: "Database insertion failed: " + err.message
@@ -94,8 +110,10 @@ exports.uploadDocument = (req, res) => {
                 message: "PDF Document uploaded successfully!",
                 id: this.lastID
             });
-        }
-    );
+        });
+    };
+
+    insertWithFallback(Boolean(fileBase64));
 };
 
 // ================= Update Student / Document Metadata =================
@@ -182,8 +200,8 @@ exports.replacePDF = (req, res) => {
         const newOriginalName = req.file.originalname;
         const newStoredFilename = req.file.filename;
         const newFileSize = req.file.size || 0;
-        let newFileBase64 = "";
-        if (req.file.path && fs.existsSync(req.file.path)) {
+        let newFileBase64 = null;
+        if (req.file.path && fs.existsSync(req.file.path) && newFileSize <= 15 * 1024 * 1024) {
             try {
                 newFileBase64 = fs.readFileSync(req.file.path).toString("base64");
             } catch (e) {
@@ -191,13 +209,24 @@ exports.replacePDF = (req, res) => {
             }
         }
 
-        db.run(
-            `UPDATE students
-             SET filename = ?, filepath = ?, file_size = ?, file_data = ?
-             WHERE id = ?`,
-            [newOriginalName, newStoredFilename, newFileSize, newFileBase64, id],
-            function (err) {
+        const updateWithFallback = (includeBase64) => {
+            const query = includeBase64
+                ? `UPDATE students
+                   SET filename = ?, filepath = ?, file_size = ?, file_data = ?
+                   WHERE id = ?`
+                : `UPDATE students
+                   SET filename = ?, filepath = ?, file_size = ?, file_data = NULL
+                   WHERE id = ?`;
+
+            const params = includeBase64
+                ? [newOriginalName, newStoredFilename, newFileSize, newFileBase64, id]
+                : [newOriginalName, newStoredFilename, newFileSize, id];
+
+            db.run(query, params, function (err) {
                 if (err) {
+                    if (includeBase64 && newFileBase64) {
+                        return updateWithFallback(false);
+                    }
                     return res.status(500).json({
                         success: false,
                         message: err.message
@@ -208,8 +237,10 @@ exports.replacePDF = (req, res) => {
                     success: true,
                     message: "PDF File replaced successfully!"
                 });
-            }
-        );
+            });
+        };
+
+        updateWithFallback(Boolean(newFileBase64));
     });
 };
 

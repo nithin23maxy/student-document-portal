@@ -29,7 +29,11 @@ app.use(session({
 // Serve uploaded PDF files with automatic database restoration fallback
 const fs = require("fs");
 app.get("/uploads/:filename", (req, res, next) => {
-    const filename = req.params.filename;
+    let filename = req.params.filename;
+    try {
+        filename = decodeURIComponent(filename);
+    } catch (e) {}
+
     const uploadDir = path.join(__dirname, "uploads");
     const filePath = path.join(uploadDir, filename);
 

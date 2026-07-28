@@ -92,6 +92,9 @@ function initTables() {
             }
         });
 
+        // Disk-to-DB Auto-Healing: Recover any orphan upload files from disk into DB
+        syncOrphanedDiskFiles();
+
         // Admins table
         db.run(`
             CREATE TABLE IF NOT EXISTS admins (
@@ -104,7 +107,7 @@ function initTables() {
         `, () => {
             // Seed default admin if missing
             db.get("SELECT COUNT(*) AS count FROM admins", async (err, row) => {
-                if (!err && row.count === 0) {
+                if (!err && row && row.count === 0) {
                     const defaultPassword = "admin123";
                     const saltRounds = 10;
                     const hash = await bcrypt.hash(defaultPassword, saltRounds);
@@ -130,15 +133,92 @@ function backfillFileData(filepath) {
     if (fs.existsSync(diskPath)) {
         try {
             const buffer = fs.readFileSync(diskPath);
-            const base64 = buffer.toString("base64");
-            const fileSize = buffer.length;
-            db.run(
-                "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
-                [base64, fileSize, filepath]
-            );
+            // Only store base64 in SQLite if file size is reasonable (<15MB) to avoid SQL statement limits
+            if (buffer.length <= 15 * 1024 * 1024) {
+                const base64 = buffer.toString("base64");
+                const fileSize = buffer.length;
+                db.run(
+                    "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
+                    [base64, fileSize, filepath]
+                );
+            } else {
+                db.run("UPDATE students SET file_size = ? WHERE filepath = ?", [buffer.length, filepath]);
+            }
         } catch (e) {
             console.warn("Backfill file_data failed for:", filepath, e.message);
         }
+    }
+}
+
+function syncOrphanedDiskFiles() {
+    const uploadDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        return;
+    }
+
+    try {
+        const filesOnDisk = fs.readdirSync(uploadDir).filter(f => f.toLowerCase().endsWith(".pdf"));
+        if (filesOnDisk.length === 0) return;
+
+        db.all("SELECT filepath, file_data, filename FROM students", [], (err, rows) => {
+            if (err || !rows) return;
+
+            const registeredFilepaths = new Set(rows.map(r => r.filepath));
+
+            // Restore any disk files missing from disk but present in file_data
+            rows.forEach(r => {
+                if (r.filepath && r.file_data) {
+                    const diskPath = path.join(uploadDir, r.filepath);
+                    if (!fs.existsSync(diskPath)) {
+                        try {
+                            const buf = Buffer.from(r.file_data, "base64");
+                            fs.writeFileSync(diskPath, buf);
+                            console.log(`⚡ Auto-restored missing disk file from database: ${r.filepath}`);
+                        } catch (e) {
+                            console.warn("Failed auto-restoring disk file:", r.filepath, e.message);
+                        }
+                    }
+                }
+            });
+
+            // Register any orphaned files on disk not found in database
+            filesOnDisk.forEach(filename => {
+                if (!registeredFilepaths.has(filename)) {
+                    const fullPath = path.join(uploadDir, filename);
+                    let fileSize = 0;
+                    let fileBase64 = "";
+
+                    try {
+                        const stat = fs.statSync(fullPath);
+                        fileSize = stat.size;
+                        if (fileSize <= 15 * 1024 * 1024) {
+                            fileBase64 = fs.readFileSync(fullPath).toString("base64");
+                        }
+                    } catch (e) {}
+
+                    // Extract original title from timestamp-filename format if available
+                    let originalName = filename;
+                    if (filename.includes("-")) {
+                        originalName = filename.split("-").slice(1).join("-") || filename;
+                    }
+
+                    console.log(`📦 Auto-registering orphaned upload file into DB: ${filename}`);
+                    db.run(
+                        `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                        ["RECOVERED", "Recovered Document", "General", originalName, originalName, filename, fileSize, fileBase64],
+                        (err) => {
+                            if (err) {
+                                console.error("Failed to register orphaned file:", filename, err.message);
+                            }
+                        }
+                    );
+                }
+            });
+        });
+    } catch (e) {
+        console.warn("Disk-to-DB sync warning:", e.message);
     }
 }
 

@@ -11,9 +11,11 @@ exports.searchStudent = (req, res) => {
         });
     }
 
+    const searchUsn = cleanUsn.replace(/\s+/g, "");
+
     db.all(
-        "SELECT id, usn, name, department, doc_title, filename, filepath, file_size, created_at FROM students WHERE UPPER(usn) = ? ORDER BY id DESC",
-        [cleanUsn],
+        "SELECT id, usn, name, department, doc_title, filename, filepath, file_size, created_at FROM students WHERE REPLACE(UPPER(usn), ' ', '') = ? OR UPPER(usn) = ? ORDER BY id DESC",
+        [searchUsn, cleanUsn],
         (err, rows) => {
             if (err) {
                 return res.status(500).json({
