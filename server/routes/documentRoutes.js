@@ -13,9 +13,9 @@ const handleUploadMiddleware = (req, res, next) => {
                 message: err.message || "File upload failed."
             });
         }
-        // Map first uploaded file to req.file for compatibility
+        // Map uploaded file to req.file for compatibility
         if (req.files && req.files.length > 0) {
-            req.file = req.files[0];
+            req.file = req.files.find(f => f.fieldname === "pdf" || f.fieldname === "document" || f.fieldname === "file") || req.files[0];
         }
         next();
     });

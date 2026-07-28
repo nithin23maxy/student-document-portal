@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
+const fs = require("fs");
 
 const db = require("./database.js");
 const authRoutes = require("./routes/authRoutes");
@@ -27,7 +28,6 @@ app.use(session({
 }));
 
 // Serve uploaded PDF files with automatic database restoration fallback
-const fs = require("fs");
 app.get("/uploads/:filename", (req, res, next) => {
     let filename = req.params.filename;
     try {
@@ -41,14 +41,17 @@ app.get("/uploads/:filename", (req, res, next) => {
         return res.sendFile(filePath);
     }
 
-    // If file is missing on disk, recover from SQLite database file_data fallback
+    // If file is missing on disk, recover from SQLite database file_data BLOB fallback
     db.get(
         "SELECT file_data, filename FROM students WHERE filepath = ? OR filename = ?",
         [filename, filename],
         (err, row) => {
             if (!err && row && row.file_data) {
                 try {
-                    const fileBuffer = Buffer.from(row.file_data, "base64");
+                    const fileBuffer = Buffer.isBuffer(row.file_data) 
+                        ? row.file_data 
+                        : Buffer.from(row.file_data, "base64");
+
                     if (!fs.existsSync(uploadDir)) {
                         fs.mkdirSync(uploadDir, { recursive: true });
                     }
@@ -68,17 +71,14 @@ app.get("/uploads/:filename", (req, res, next) => {
 });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Serve frontend client static files
-app.use(express.static(path.join(__dirname, "../client")));
-
-// API Route Mounts
+// ================= API Route Mounts (MUST BE BEFORE STATIC FILES) =================
 app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/document", documentRoutes); // Singular alias compatibility
 app.use("/api/student", studentRoutes);
 app.use("/api/students", documentRoutes); // Students list alias compatibility
 
-// Test Route
+// API Test Route
 app.get("/api/test", (req, res) => {
     res.json({ success: true, message: "Student Document Portal Server is Running" });
 });
@@ -89,13 +89,23 @@ app.post("/login", (req, res, next) => {
     app._router.handle(req, res, next);
 });
 
-// Protected page route check for admin.html
+// Protected page route checks
 app.get("/admin.html", (req, res, next) => {
     if (!req.session || (!req.session.admin && !req.session.user)) {
         return res.redirect("/login.html");
     }
     next();
 });
+
+app.get("/upload.html", (req, res, next) => {
+    if (!req.session || (!req.session.admin && !req.session.user)) {
+        return res.redirect("/login.html");
+    }
+    next();
+});
+
+// Serve frontend client static files
+app.use(express.static(path.join(__dirname, "../client")));
 
 // SPA / Direct link fallback to client/index.html
 app.use((req, res) => {

@@ -1,10 +1,10 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Check if USN query parameter exists in URL
+    // Check if query parameter exists in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const usnParam = urlParams.get("usn");
-    if (usnParam) {
-        document.getElementById("usnQuery").value = usnParam;
-        performSearch(usnParam);
+    const queryParam = urlParams.get("usn") || urlParams.get("q");
+    if (queryParam) {
+        document.getElementById("usnQuery").value = queryParam;
+        performSearch(queryParam);
     }
 });
 
@@ -14,29 +14,29 @@ function executeSearch(e) {
     if (!usn) return;
     
     // Update URL parameter without full reload for easy sharing
-    const newUrl = window.location.pathname + '?usn=' + encodeURIComponent(usn);
+    const newUrl = window.location.pathname + '?q=' + encodeURIComponent(usn);
     window.history.pushState({ path: newUrl }, '', newUrl);
 
     performSearch(usn);
 }
 
-async function performSearch(usn) {
+async function performSearch(query) {
     const container = document.getElementById("resultsContainer");
     container.innerHTML = `
-        <div style="text-align: center; padding: 40px;">
+        <div style="text-align: center; padding: 50px 20px;">
             <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
-            <p style="margin-top: 12px; color: var(--text-muted);">Searching records for ${usn}...</p>
+            <p style="margin-top: 14px; color: var(--text-muted); font-size: 1rem; font-weight: 500;">Searching records for "${escapeHtml(query)}"...</p>
         </div>
     `;
 
     try {
-        const response = await fetch(`/api/student/search/${encodeURIComponent(usn)}`, {
+        const response = await fetch(`/api/student/search?q=${encodeURIComponent(query)}`, {
             headers: { "Bypass-Tunnel-Reminder": "true" }
         });
         const data = await response.json();
 
-        if (!data.success || !data.found) {
-            renderNotFound(container, usn);
+        if (!data.success || !data.found || !data.documents || data.documents.length === 0) {
+            renderNotFound(container, query);
             return;
         }
 
@@ -49,7 +49,7 @@ async function performSearch(usn) {
                     <i class="fa-solid fa-triangle-exclamation"></i>
                 </div>
                 <h3>Server Error</h3>
-                <p>Could not connect to the server. Please try again later.</p>
+                <p>Could not connect to the document search server. Please verify your connection.</p>
             </div>
         `;
     }
@@ -63,7 +63,7 @@ function renderStudentResults(container, student, documents) {
         const formattedDate = doc.created_at ? new Date(doc.created_at).toLocaleDateString(undefined, {
             year: 'numeric', month: 'short', day: 'numeric'
         }) : 'Uploaded';
-        const formattedSize = doc.file_size ? (doc.file_size / 1024 / 1024).toFixed(2) + ' MB' : 'PDF Document';
+        const formattedSize = doc.file_size ? (doc.file_size / (1024 * 1024)).toFixed(2) + ' MB' : 'PDF Document';
 
         docsHtml += `
             <div class="doc-card">
@@ -77,8 +77,13 @@ function renderStudentResults(container, student, documents) {
                             <div class="doc-subtitle">${escapeHtml(doc.filename)} • ${formattedSize}</div>
                         </div>
                     </div>
+                    ${doc.usn && doc.usn.toUpperCase() !== student.usn.toUpperCase() ? `
+                        <div style="font-size: 0.88rem; font-weight: 600; color: var(--primary); margin-top: 6px;">
+                            <i class="fa-solid fa-user-graduate"></i> ${escapeHtml(doc.name)} (${escapeHtml(doc.usn)})
+                        </div>
+                    ` : ''}
                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">
-                        <i class="fa-regular fa-calendar-check"></i> Added on ${formattedDate}
+                        <i class="fa-regular fa-calendar-check"></i> Uploaded on ${formattedDate}
                     </div>
                 </div>
 
@@ -107,14 +112,14 @@ function renderStudentResults(container, student, documents) {
                     </div>
                 </div>
             </div>
-            <div style="font-size: 0.9rem; color: var(--success); font-weight: 700; background: #dcfce7; padding: 8px 16px; border-radius: 50px;">
-                <i class="fa-solid fa-circle-check"></i> Verified ${documents.length} File(s)
+            <div style="font-size: 0.9rem; color: var(--success); font-weight: 700; background: #dcfce7; padding: 8px 18px; border-radius: 50px; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-circle-check"></i> Found ${documents.length} File(s)
             </div>
         </div>
 
         <!-- Available Documents Grid -->
-        <h3 style="font-size: 1.2rem; margin-bottom: 16px;">
-            <i class="fa-solid fa-folder"></i> Available Documents (${documents.length})
+        <h3 style="font-size: 1.25rem; margin-bottom: 18px; color: var(--text-main);">
+            <i class="fa-solid fa-folder-open" style="color: var(--primary);"></i> Available Student Documents (${documents.length})
         </h3>
         <div class="documents-grid">
             ${docsHtml}
@@ -122,19 +127,21 @@ function renderStudentResults(container, student, documents) {
     `;
 }
 
-function renderNotFound(container, usn) {
+function renderNotFound(container, query) {
     container.innerHTML = `
         <div class="not-found-card">
             <div class="not-found-icon">
                 <i class="fa-solid fa-file-circle-xmark"></i>
             </div>
-            <h3>File Not Found</h3>
-            <p>No document registered for USN <strong>"${escapeHtml(usn.toUpperCase())}"</strong>.</p>
-            <div style="font-size: 0.88rem; color: var(--text-muted); background: var(--light-bg); padding: 16px; border-radius: var(--radius-md); text-align: left; margin-bottom: 20px;">
-                <strong><i class="fa-solid fa-lightbulb"></i> Tips:</strong>
-                <ul style="margin-left: 20px; margin-top: 6px;">
-                    <li>Double check the USN spelling and formatting.</li>
-                    <li>Contact your administrator to request document upload.</li>
+            <h3>No Documents Found</h3>
+            <p>No student PDF documents registered matching <strong>"${escapeHtml(query)}"</strong>.</p>
+            <div style="font-size: 0.88rem; color: var(--text-muted); background: var(--light-bg); padding: 18px; border-radius: var(--radius-md); text-align: left; margin-bottom: 24px; border: 1px solid var(--border-color);">
+                <strong><i class="fa-solid fa-lightbulb" style="color: var(--warning);"></i> Search Tips:</strong>
+                <ul style="margin-left: 20px; margin-top: 8px; line-height: 1.6;">
+                    <li>Search by Student USN (e.g. <code>1MS21CS001</code>).</li>
+                    <li>Search by Student Name (e.g. <code>Rahul</code>).</li>
+                    <li>Search by Department or Course (e.g. <code>Computer Science</code>).</li>
+                    <li>Search by Document Title (e.g. <code>Marksheet</code>, <code>Grade Card</code>).</li>
                 </ul>
             </div>
             <a href="search.html" class="btn btn-outline btn-sm">Clear Search</a>
@@ -150,7 +157,7 @@ function openPdfModal(filepath, title, filename) {
     const downloadBtn = document.getElementById("pdfModalDownloadBtn");
 
     modalTitle.innerHTML = `<i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> ${escapeHtml(title)}`;
-    modalFilename.textContent = filename;
+    if (modalFilename) modalFilename.textContent = filename;
     downloadBtn.href = `/uploads/${filepath}`;
     downloadBtn.setAttribute("download", filename);
 

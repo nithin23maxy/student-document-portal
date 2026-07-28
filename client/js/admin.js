@@ -127,7 +127,18 @@ async function handleUploadSubmit(e) {
     const fileInput = document.getElementById("uploadFile");
 
     if (!fileInput.files || fileInput.files.length === 0) {
-        showToast("Please choose a PDF file.", "error");
+        showToast("Please choose a PDF file to upload.", "error");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+        showToast("Selected file must be a PDF document (.pdf).", "error");
+        return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+        showToast("File size exceeds 50MB limit.", "error");
         return;
     }
 
@@ -136,10 +147,10 @@ async function handleUploadSubmit(e) {
     formData.append("name", name);
     formData.append("department", department);
     formData.append("doc_title", doc_title);
-    formData.append("pdf", fileInput.files[0]);
+    formData.append("pdf", file);
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading...`;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading PDF...`;
 
     try {
         const res = await fetch("/api/documents/upload", {
@@ -149,6 +160,12 @@ async function handleUploadSubmit(e) {
             },
             body: formData
         });
+
+        if (res.status === 401) {
+            showToast("Session expired. Redirecting to login...", "error");
+            setTimeout(() => { window.location.href = "login.html"; }, 1500);
+            return;
+        }
 
         const data = await res.json();
         if (data.success) {

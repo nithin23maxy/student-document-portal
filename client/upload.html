@@ -7,52 +7,54 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body style="background: var(--light-bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;">
+<body style="background: radial-gradient(circle at 50% 30%, #1e1b4b 0%, #0f172a 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 24px 16px; margin: 0;">
 
-    <div class="search-card" style="max-width: 480px; width: 100%;">
-        <div style="text-align: center; margin-bottom: 24px;">
-            <div style="width: 56px; height: 56px; background: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 1.5rem;">
+    <div class="search-card" style="max-width: 500px; width: 100%; padding: 36px; border-radius: var(--radius-xl); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.45);">
+        <div style="text-align: center; margin-bottom: 28px;">
+            <div style="width: 60px; height: 60px; background: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 1.6rem; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
             </div>
-            <h2 style="font-size: 1.5rem;">Upload Student PDF</h2>
-            <p style="color: var(--text-muted); font-size: 0.9rem;">Add a new academic document to the student database</p>
+            <h2 style="font-size: 1.65rem; font-weight: 800; color: #0f172a;">Upload Student PDF</h2>
+            <p style="color: #64748b; font-size: 0.92rem; margin-top: 4px;">Add a new academic document to the student database</p>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="form-group">
-                <label class="form-label" for="usn">Student USN / Roll No *</label>
+                <label class="form-label" for="usn" style="color: #1e293b;">Student USN / Roll No *</label>
                 <input type="text" id="usn" name="usn" class="form-control" placeholder="e.g. 1MS21CS001" required>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="name">Student Full Name *</label>
+                <label class="form-label" for="name" style="color: #1e293b;">Student Full Name *</label>
                 <input type="text" id="name" name="name" class="form-control" placeholder="e.g. Rahul Sharma" required>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="department">Department / Course *</label>
+                <label class="form-label" for="department" style="color: #1e293b;">Department / Course *</label>
                 <input type="text" id="department" name="department" class="form-control" placeholder="e.g. Computer Science" required>
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="doc_title">Document Title (Optional)</label>
+                <label class="form-label" for="doc_title" style="color: #1e293b;">Document Title (Optional)</label>
                 <input type="text" id="doc_title" name="doc_title" class="form-control" placeholder="e.g. 1st Sem Grade Card, Certificate">
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="pdf">Select PDF File *</label>
-                <input type="file" id="pdf" name="pdf" class="form-control" accept="application/pdf" required>
+                <label class="form-label" for="pdf" style="color: #1e293b;">Select PDF File *</label>
+                <input type="file" id="pdf" name="pdf" class="form-control" accept="application/pdf,.pdf" required>
             </div>
 
-            <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; padding: 12px;">
+            <div id="fileInfoBox" style="display: none; align-items: center; gap: 12px; padding: 12px 16px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: var(--radius-md); margin-bottom: 18px; font-size: 0.9rem; color: #1e1b4b;"></div>
+
+            <button type="submit" id="submitBtn" class="btn btn-primary" style="width: 100%; padding: 13px; font-size: 1rem; margin-top: 8px;">
                 <i class="fa-solid fa-upload"></i> Upload Document
             </button>
         </form>
 
-        <div id="msg" style="margin-top: 16px; text-align: center; font-weight: 600; font-size: 0.9rem;"></div>
+        <div id="msg" style="margin-top: 18px; text-align: center; font-weight: 600; font-size: 0.92rem;"></div>
 
-        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); text-align: center;">
-            <a href="admin.html" style="font-size: 0.9rem; font-weight: 600;">
+        <div style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border-color); text-align: center;">
+            <a href="admin.html" style="font-size: 0.92rem; font-weight: 600; color: var(--primary);">
                 <i class="fa-solid fa-arrow-left"></i> Return to Admin Dashboard
             </a>
         </div>

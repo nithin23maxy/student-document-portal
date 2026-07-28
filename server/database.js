@@ -36,6 +36,7 @@ function initTables() {
                 filename TEXT NOT NULL,
                 filepath TEXT NOT NULL,
                 file_size INTEGER DEFAULT 0,
+                file_data BLOB,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -43,48 +44,10 @@ function initTables() {
         // Migration: ensure columns doc_title, file_size & file_data exist if table was created earlier
         db.run("ALTER TABLE students ADD COLUMN doc_title TEXT DEFAULT 'Document'", (err) => {});
         db.run("ALTER TABLE students ADD COLUMN file_size INTEGER DEFAULT 0", (err) => {});
-        db.run("ALTER TABLE students ADD COLUMN file_data TEXT", (err) => {});
+        db.run("ALTER TABLE students ADD COLUMN file_data BLOB", (err) => {});
 
-        // Legacy database migration: import from documents.db if it exists
-        const legacyDbPath = path.join(dbFolder, "documents.db");
-        if (fs.existsSync(legacyDbPath)) {
-            const legacyDb = new sqlite3.Database(legacyDbPath, (err) => {
-                if (!err) {
-                    legacyDb.all("SELECT * FROM students", [], (err, rows) => {
-                        if (!err && rows && rows.length > 0) {
-                            rows.forEach(row => {
-                                const usn = row.usn || "";
-                                const name = row.name || "";
-                                const dept = row.department || "";
-                                const docTitle = row.doc_title || row.filename || "Document";
-                                const filename = row.filename || "";
-                                const filepath = row.filepath || "";
-                                const fileSize = row.file_size || 0;
-
-                                db.get("SELECT id FROM students WHERE filepath = ?", [filepath], (err, existing) => {
-                                    if (!err && !existing && filepath) {
-                                        db.run(
-                                            `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size)
-                                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                                            [usn, name, dept, docTitle, filename, filepath, fileSize],
-                                            (err) => {
-                                                if (!err) {
-                                                    console.log(`📦 Restored legacy document for USN ${usn}: ${filename}`);
-                                                    backfillFileData(filepath);
-                                                }
-                                            }
-                                        );
-                                    }
-                                });
-                            });
-                        }
-                    });
-                }
-            });
-        }
-
-        // Backfill missing file_data from disk uploads directory for existing rows
-        db.all("SELECT id, filepath FROM students WHERE file_data IS NULL OR file_data = ''", [], (err, rows) => {
+        // Backfill missing file_data BLOB from disk uploads directory for existing rows
+        db.all("SELECT id, filepath FROM students WHERE file_data IS NULL", [], (err, rows) => {
             if (!err && rows && rows.length > 0) {
                 rows.forEach(r => {
                     backfillFileData(r.filepath);
@@ -133,13 +96,11 @@ function backfillFileData(filepath) {
     if (fs.existsSync(diskPath)) {
         try {
             const buffer = fs.readFileSync(diskPath);
-            // Only store base64 in SQLite if file size is reasonable (<15MB) to avoid SQL statement limits
-            if (buffer.length <= 15 * 1024 * 1024) {
-                const base64 = buffer.toString("base64");
-                const fileSize = buffer.length;
+            // Store binary BLOB in SQLite for auto-healing persistence (up to 30MB)
+            if (buffer.length <= 30 * 1024 * 1024) {
                 db.run(
                     "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
-                    [base64, fileSize, filepath]
+                    [buffer, buffer.length, filepath]
                 );
             } else {
                 db.run("UPDATE students SET file_size = ? WHERE filepath = ?", [buffer.length, filepath]);
@@ -166,13 +127,13 @@ function syncOrphanedDiskFiles() {
 
             const registeredFilepaths = new Set(rows.map(r => r.filepath));
 
-            // Restore any disk files missing from disk but present in file_data
+            // Restore any disk files missing from disk but present in file_data BLOB
             rows.forEach(r => {
                 if (r.filepath && r.file_data) {
                     const diskPath = path.join(uploadDir, r.filepath);
                     if (!fs.existsSync(diskPath)) {
                         try {
-                            const buf = Buffer.from(r.file_data, "base64");
+                            const buf = Buffer.isBuffer(r.file_data) ? r.file_data : Buffer.from(r.file_data, "base64");
                             fs.writeFileSync(diskPath, buf);
                             console.log(`⚡ Auto-restored missing disk file from database: ${r.filepath}`);
                         } catch (e) {
@@ -187,17 +148,16 @@ function syncOrphanedDiskFiles() {
                 if (!registeredFilepaths.has(filename)) {
                     const fullPath = path.join(uploadDir, filename);
                     let fileSize = 0;
-                    let fileBase64 = "";
+                    let fileBuffer = null;
 
                     try {
                         const stat = fs.statSync(fullPath);
                         fileSize = stat.size;
-                        if (fileSize <= 15 * 1024 * 1024) {
-                            fileBase64 = fs.readFileSync(fullPath).toString("base64");
+                        if (fileSize <= 30 * 1024 * 1024) {
+                            fileBuffer = fs.readFileSync(fullPath);
                         }
                     } catch (e) {}
 
-                    // Extract original title from timestamp-filename format if available
                     let originalName = filename;
                     if (filename.includes("-")) {
                         originalName = filename.split("-").slice(1).join("-") || filename;
@@ -207,7 +167,7 @@ function syncOrphanedDiskFiles() {
                     db.run(
                         `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                        ["RECOVERED", "Recovered Document", "General", originalName, originalName, filename, fileSize, fileBase64],
+                        ["RECOVERED", "Recovered Document", "General", originalName, originalName, filename, fileSize, fileBuffer],
                         (err) => {
                             if (err) {
                                 console.error("Failed to register orphaned file:", filename, err.message);

@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
     },
     filename: function(req, file, cb) {
         // Clean original filename
-        const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+        const safeOriginalName = (file.originalname || "document.pdf").replace(/[^a-zA-Z0-9.\-_]/g, "_");
         cb(null, Date.now() + "-" + safeOriginalName);
     }
 });
@@ -26,13 +26,20 @@ const upload = multer({
         fileSize: 50 * 1024 * 1024 // 50MB max limit
     },
     fileFilter: function(req, file, cb) {
-        const isPdfExt = path.extname(file.originalname).toLowerCase() === ".pdf";
-        const isPdfMime = file.mimetype.includes("pdf") || file.mimetype === "application/octet-stream";
+        const ext = path.extname(file.originalname || "").toLowerCase();
+        const mime = (file.mimetype || "").toLowerCase();
+
+        const isPdfExt = ext === ".pdf";
+        const isPdfMime = mime.includes("pdf") || 
+                         mime === "application/octet-stream" || 
+                         mime === "application/x-download" || 
+                         mime === "binary/octet-stream" ||
+                         mime === "";
 
         if (isPdfExt || isPdfMime) {
             cb(null, true);
         } else {
-            cb(new Error("Only PDF files (.pdf) are allowed."));
+            cb(new Error("Only PDF documents (.pdf) are allowed. Please select a valid PDF file."));
         }
     }
 });
