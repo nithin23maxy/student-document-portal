@@ -3,44 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login</title>
+    <title>Login - Student Document Portal</title>
 
-    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            text-align: center;
+            margin-top: 100px;
+        }
+
+        .login-box {
+            background: white;
+            width: 350px;
+            margin: auto;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px gray;
+        }
+
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px;
+        }
+
+        button {
+            padding: 10px 30px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 
 <body>
 
 <div class="login-box">
 
-    <h1>Student Document Portal</h1>
+    <h2>Student Login</h2>
 
-    <h3>Administrator Login</h3>
+    <input type="email" placeholder="Email">
 
-    <form id="loginForm">
+    <input type="password" placeholder="Password">
 
-        <input
-            type="text"
-            id="username"
-            placeholder="Username"
-            required>
-
-        <input
-            type="password"
-            id="password"
-            placeholder="Password"
-            required>
-
-        <button type="submit">
-            Login
-        </button>
-
-    </form>
-
-    <p id="message"></p>
+    <button>
+        Login
+    </button>
 
 </div>
-
-<script src="../js/login.js"></script>
 
 </body>
 </html>
