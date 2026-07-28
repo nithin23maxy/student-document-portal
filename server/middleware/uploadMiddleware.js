@@ -1,36 +1,54 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+
+
+const uploadPath = path.join(__dirname, "../uploads");
+
+
+// Create uploads folder if missing
+if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+}
+
 
 const storage = multer.diskStorage({
 
-    destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, "../uploads"));
+    destination: function(req, file, cb) {
+
+        cb(null, uploadPath);
+
     },
 
-    filename: (req, file, cb) => {
 
-        const uniqueName = Date.now() + "-" + file.originalname;
+    filename: function(req, file, cb) {
 
-        cb(null, uniqueName);
+        cb(null, Date.now() + "-" + file.originalname);
 
     }
 
 });
 
+
 const upload = multer({
 
-    storage,
+    storage: storage,
 
-    fileFilter: (req, file, cb) => {
+    fileFilter: function(req, file, cb) {
 
-        if (file.mimetype === "application/pdf") {
+        if(file.mimetype === "application/pdf") {
+
             cb(null, true);
+
         } else {
-            cb(new Error("Only PDF files are allowed"));
+
+            cb(new Error("Only PDF files allowed"));
+
         }
 
     }
 
 });
+
 
 module.exports = upload;
