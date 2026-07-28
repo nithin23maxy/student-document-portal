@@ -4,12 +4,15 @@ const fs = require("fs");
 
 const dbFolder = path.join(__dirname, "database");
 
-// Create database folder if it does not exist
+console.log("Database folder:", dbFolder);
+
 if (!fs.existsSync(dbFolder)) {
     fs.mkdirSync(dbFolder, { recursive: true });
 }
 
 const dbPath = path.join(dbFolder, "student_portal.db");
+
+console.log("Database path:", dbPath);
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
