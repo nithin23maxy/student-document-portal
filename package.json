@@ -18,14 +18,16 @@
   "license": "MIT",
   "type": "commonjs",
   "engines": {
-    "node": "20.x"
+    "node": ">=20.x"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "connect-sqlite3": "^0.9.17",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.18.1",
+    "memorystore": "^1.6.8",
     "multer": "^2.2.0",
     "sqlite3": "^5.1.7"
   },

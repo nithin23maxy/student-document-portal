@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
+const MemoryStore = require("memorystore")(session);
 const fs = require("fs");
 
 const db = require("./database.js");
@@ -11,14 +12,20 @@ const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
 
+// Trust reverse proxy for cloud deployments (Render, Railway, Heroku, Nginx)
+app.set("trust proxy", 1);
+
 // Enable CORS & Body Parsers
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Express Session
+// Production-ready Session Store (prevents memory leaks & MemoryStore warning on deployment)
 app.use(session({
-    secret: "student-document-portal-secret-key-2026",
+    store: new MemoryStore({
+        checkPeriod: 24 * 60 * 60 * 1000 // Prune expired entries every 24 hours
+    }),
+    secret: process.env.SESSION_SECRET || "student-document-portal-secret-key-2026",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -71,7 +78,7 @@ app.get("/uploads/:filename", (req, res, next) => {
 });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ================= API Route Mounts (MUST BE BEFORE STATIC FILES) =================
+// ================= API Route Mounts =================
 app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/document", documentRoutes); // Singular alias compatibility
