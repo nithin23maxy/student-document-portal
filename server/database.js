@@ -1,7 +1,19 @@
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
+const fs = require("fs");
 
-const dbPath = path.join(__dirname, "database", "studentportal.db");
+
+const dbFolder = path.join(__dirname, "database");
+
+
+// Create database folder if missing
+if (!fs.existsSync(dbFolder)) {
+    fs.mkdirSync(dbFolder, { recursive: true });
+}
+
+
+const dbPath = path.join(dbFolder, "studentportal.db");
+
 
 console.log("SQLite database path:", dbPath);
 
