@@ -67,10 +67,19 @@ exports.uploadDocument = (req, res) => {
     const storedFilename = req.file.filename;
     const fileSize = req.file.size || 0;
 
+    let fileBase64 = "";
+    if (req.file.path && fs.existsSync(req.file.path)) {
+        try {
+            fileBase64 = fs.readFileSync(req.file.path).toString("base64");
+        } catch (e) {
+            console.warn("Could not read uploaded file to base64:", e.message);
+        }
+    }
+
     db.run(
-        `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize],
+        `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBase64],
         function (err) {
             if (err) {
                 console.error("Database Insert Error:", err.message);
@@ -173,12 +182,20 @@ exports.replacePDF = (req, res) => {
         const newOriginalName = req.file.originalname;
         const newStoredFilename = req.file.filename;
         const newFileSize = req.file.size || 0;
+        let newFileBase64 = "";
+        if (req.file.path && fs.existsSync(req.file.path)) {
+            try {
+                newFileBase64 = fs.readFileSync(req.file.path).toString("base64");
+            } catch (e) {
+                console.warn("Could not read replacement file to base64:", e.message);
+            }
+        }
 
         db.run(
             `UPDATE students
-             SET filename = ?, filepath = ?, file_size = ?
+             SET filename = ?, filepath = ?, file_size = ?, file_data = ?
              WHERE id = ?`,
-            [newOriginalName, newStoredFilename, newFileSize, id],
+            [newOriginalName, newStoredFilename, newFileSize, newFileBase64, id],
             function (err) {
                 if (err) {
                     return res.status(500).json({

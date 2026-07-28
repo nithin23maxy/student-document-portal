@@ -26,7 +26,42 @@ app.use(session({
     }
 }));
 
-// Serve uploaded PDF files statically
+// Serve uploaded PDF files with automatic database restoration fallback
+const fs = require("fs");
+app.get("/uploads/:filename", (req, res, next) => {
+    const filename = req.params.filename;
+    const uploadDir = path.join(__dirname, "uploads");
+    const filePath = path.join(uploadDir, filename);
+
+    if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+    }
+
+    // If file is missing on disk, recover from SQLite database file_data fallback
+    db.get(
+        "SELECT file_data, filename FROM students WHERE filepath = ? OR filename = ?",
+        [filename, filename],
+        (err, row) => {
+            if (!err && row && row.file_data) {
+                try {
+                    const fileBuffer = Buffer.from(row.file_data, "base64");
+                    if (!fs.existsSync(uploadDir)) {
+                        fs.mkdirSync(uploadDir, { recursive: true });
+                    }
+                    fs.writeFileSync(filePath, fileBuffer);
+                    console.log(`⚡ Restored missing disk file from database fallback: ${filename}`);
+
+                    res.setHeader("Content-Type", "application/pdf");
+                    res.setHeader("Content-Disposition", `inline; filename="${row.filename || filename}"`);
+                    return res.send(fileBuffer);
+                } catch (restoreErr) {
+                    console.error("Failed to restore PDF from database:", restoreErr.message);
+                }
+            }
+            res.status(404).send("PDF Document not found.");
+        }
+    );
+});
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Serve frontend client static files

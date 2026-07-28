@@ -40,12 +40,56 @@ function initTables() {
             )
         `);
 
-        // Migration: ensure columns doc_title & file_size exist if table was created earlier
-        db.run("ALTER TABLE students ADD COLUMN doc_title TEXT DEFAULT 'Document'", (err) => {
-            // Ignored if column already exists
-        });
-        db.run("ALTER TABLE students ADD COLUMN file_size INTEGER DEFAULT 0", (err) => {
-            // Ignored if column already exists
+        // Migration: ensure columns doc_title, file_size & file_data exist if table was created earlier
+        db.run("ALTER TABLE students ADD COLUMN doc_title TEXT DEFAULT 'Document'", (err) => {});
+        db.run("ALTER TABLE students ADD COLUMN file_size INTEGER DEFAULT 0", (err) => {});
+        db.run("ALTER TABLE students ADD COLUMN file_data TEXT", (err) => {});
+
+        // Legacy database migration: import from documents.db if it exists
+        const legacyDbPath = path.join(dbFolder, "documents.db");
+        if (fs.existsSync(legacyDbPath)) {
+            const legacyDb = new sqlite3.Database(legacyDbPath, (err) => {
+                if (!err) {
+                    legacyDb.all("SELECT * FROM students", [], (err, rows) => {
+                        if (!err && rows && rows.length > 0) {
+                            rows.forEach(row => {
+                                const usn = row.usn || "";
+                                const name = row.name || "";
+                                const dept = row.department || "";
+                                const docTitle = row.doc_title || row.filename || "Document";
+                                const filename = row.filename || "";
+                                const filepath = row.filepath || "";
+                                const fileSize = row.file_size || 0;
+
+                                db.get("SELECT id FROM students WHERE filepath = ?", [filepath], (err, existing) => {
+                                    if (!err && !existing && filepath) {
+                                        db.run(
+                                            `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size)
+                                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                            [usn, name, dept, docTitle, filename, filepath, fileSize],
+                                            (err) => {
+                                                if (!err) {
+                                                    console.log(`📦 Restored legacy document for USN ${usn}: ${filename}`);
+                                                    backfillFileData(filepath);
+                                                }
+                                            }
+                                        );
+                                    }
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // Backfill missing file_data from disk uploads directory for existing rows
+        db.all("SELECT id, filepath FROM students WHERE file_data IS NULL OR file_data = ''", [], (err, rows) => {
+            if (!err && rows && rows.length > 0) {
+                rows.forEach(r => {
+                    backfillFileData(r.filepath);
+                });
+            }
         });
 
         // Admins table
@@ -78,6 +122,24 @@ function initTables() {
             });
         });
     });
+}
+
+function backfillFileData(filepath) {
+    if (!filepath) return;
+    const diskPath = path.join(__dirname, "uploads", filepath);
+    if (fs.existsSync(diskPath)) {
+        try {
+            const buffer = fs.readFileSync(diskPath);
+            const base64 = buffer.toString("base64");
+            const fileSize = buffer.length;
+            db.run(
+                "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
+                [base64, fileSize, filepath]
+            );
+        } catch (e) {
+            console.warn("Backfill file_data failed for:", filepath, e.message);
+        }
+    }
 }
 
 module.exports = db;
