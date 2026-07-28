@@ -1,52 +1,86 @@
 const bcrypt = require("bcrypt");
-
 const db = require("../database");
 
 exports.login = (req, res) => {
+    const { username, email, password } = req.body;
+    const loginIdentifier = (username || email || "").trim();
+    const inputPassword = (password || "").trim();
 
-    const { username, password } = req.body;
+    if (!loginIdentifier || !inputPassword) {
+        return res.status(400).json({
+            success: false,
+            message: "Please provide username/email and password."
+        });
+    }
 
     db.get(
-        "SELECT * FROM admins WHERE username=?",
-        [username],
+        "SELECT * FROM admins WHERE username = ? OR email = ?",
+        [loginIdentifier, loginIdentifier],
         async (err, admin) => {
-
             if (err) {
-
                 return res.status(500).json({
                     success: false,
-                    message: "Database Error"
+                    message: "Database error: " + err.message
                 });
-
             }
 
             if (!admin) {
-
-                return res.json({
+                return res.status(401).json({
                     success: false,
-                    message: "Invalid Username"
+                    message: "Invalid username/email or password."
                 });
-
             }
 
-            const match = await bcrypt.compare(password, admin.password);
-
+            const match = await bcrypt.compare(inputPassword, admin.password);
             if (!match) {
-
-                return res.json({
+                return res.status(401).json({
                     success: false,
-                    message: "Invalid Password"
+                    message: "Invalid username/email or password."
                 });
-
             }
 
-            res.json({
+            // Store admin in session
+            const sessionData = {
+                id: admin.id,
+                username: admin.username,
+                email: admin.email
+            };
+            req.session.admin = sessionData;
+            req.session.user = sessionData; // Compatibility
+
+            return res.json({
                 success: true,
-                message: "Login Successful"
+                message: "Login successful!",
+                admin: sessionData
             });
-
         }
-
     );
+};
 
+exports.logout = (req, res) => {
+    if (req.session) {
+        req.session.destroy((err) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: "Could not log out." });
+            }
+            res.clearCookie("connect.sid");
+            return res.json({ success: true, message: "Logged out successfully." });
+        });
+    } else {
+        return res.json({ success: true, message: "Logged out successfully." });
+    }
+};
+
+exports.checkSession = (req, res) => {
+    if (req.session && (req.session.admin || req.session.user)) {
+        return res.json({
+            success: true,
+            authenticated: true,
+            admin: req.session.admin || req.session.user
+        });
+    }
+    return res.json({
+        success: true,
+        authenticated: false
+    });
 };

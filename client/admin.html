@@ -1,191 +1,243 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Admin Dashboard</title>
-
-<style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial,Helvetica,sans-serif;
-}
-
-body{
-display:flex;
-background:#f4f6f9;
-}
-
-.sidebar{
-width:240px;
-height:100vh;
-background:#1e3a8a;
-color:white;
-padding:20px;
-}
-
-.sidebar h2{
-text-align:center;
-margin-bottom:30px;
-}
-
-.sidebar a{
-display:block;
-padding:12px;
-margin:10px 0;
-color:white;
-text-decoration:none;
-border-radius:5px;
-}
-
-.sidebar a:hover{
-background:#2563eb;
-}
-
-.main{
-flex:1;
-padding:30px;
-}
-
-.cards{
-display:flex;
-gap:20px;
-margin-bottom:30px;
-}
-
-.card{
-flex:1;
-background:white;
-padding:20px;
-border-radius:10px;
-box-shadow:0 0 10px rgba(0,0,0,.1);
-text-align:center;
-}
-
-table{
-width:100%;
-border-collapse:collapse;
-background:white;
-}
-
-th,td{
-padding:12px;
-border:1px solid #ddd;
-text-align:center;
-}
-
-th{
-background:#2563eb;
-color:white;
-}
-
-button{
-padding:8px 15px;
-border:none;
-border-radius:5px;
-cursor:pointer;
-}
-
-.view{
-background:green;
-color:white;
-}
-
-.delete{
-background:red;
-color:white;
-}
-
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Student Document Management</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+<body style="background: var(--light-bg);">
 
-<body>
+    <!-- Admin Wrapper Layout -->
+    <div class="admin-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div>
+                <div class="nav-brand" style="color: white; margin-bottom: 32px; padding: 0 8px;">
+                    <i class="fa-solid fa-graduation-cap" style="color: var(--secondary);"></i>
+                    <span>Admin Panel</span>
+                </div>
 
-<div class="sidebar">
+                <nav class="sidebar-menu">
+                    <a href="admin.html" class="active"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+                    <a href="javascript:void(0)" onclick="openUploadModal()"><i class="fa-solid fa-cloud-arrow-up"></i> Upload PDF</a>
+                    <a href="search.html" target="_blank"><i class="fa-solid fa-magnifying-glass"></i> Student View</a>
+                    <a href="index.html" target="_blank"><i class="fa-solid fa-globe"></i> Portal Homepage</a>
+                </nav>
+            </div>
 
-<h2>Admin</h2>
+            <div>
+                <button type="button" class="btn btn-outline btn-sm" onclick="handleLogout()" style="width: 100%; color: var(--text-light); border-color: rgba(255,255,255,0.2);">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
+                </button>
+            </div>
+        </aside>
 
-<a href="admin.html">Dashboard</a>
-<a href="upload.html">Upload PDF</a>
-<a href="#">Students</a>
-<a href="#">Search</a>
-<a href="index.html">Logout</a>
+        <!-- Main Content Area -->
+        <main class="admin-main">
+            <!-- Top Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h1 style="font-size: 1.8rem;">Document Management Dashboard</h1>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Add, update, rename, replace, or remove student PDF files</p>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="openUploadModal()">
+                    <i class="fa-solid fa-plus"></i> Upload New PDF
+                </button>
+            </div>
 
-</div>
+            <!-- Stats Widgets Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Total Unique Students</h4>
+                        <div id="statUniqueStudents" class="stat-value">0</div>
+                    </div>
+                </div>
 
-<div class="main">
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fa-solid fa-file-pdf"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Total Uploaded PDFs</h4>
+                        <div id="statTotalDocs" class="stat-value">0</div>
+                    </div>
+                </div>
 
-<h1>Student Document Portal</h1>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fa-solid fa-building-columns"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h4>Departments Active</h4>
+                        <div id="statDepts" class="stat-value">0</div>
+                    </div>
+                </div>
+            </div>
 
-<br>
+            <!-- Table Card Container -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3 style="font-size: 1.15rem;"><i class="fa-solid fa-table-list"></i> All Student Documents</h3>
+                    
+                    <div style="display: flex; gap: 12px; max-width: 400px; width: 100%;">
+                        <div style="position: relative; width: 100%;">
+                            <input type="text" id="adminSearchInput" class="form-control" placeholder="Filter by USN, Name, Dept, or Title..." onkeyup="filterAdminTable()">
+                            <i class="fa-solid fa-magnifying-glass" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+                        </div>
+                    </div>
+                </div>
 
-<div class="cards">
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>USN</th>
+                                <th>Student Name</th>
+                                <th>Department</th>
+                                <th>Document Title</th>
+                                <th>File Name</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading documents...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
 
-<div class="card">
+    <!-- ================= Upload PDF Modal ================= -->
+    <div id="uploadModal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary);"></i> Upload Student PDF</h3>
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('uploadModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="uploadForm" onsubmit="handleUploadSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="uploadUsn">Student USN / Roll No *</label>
+                        <input type="text" id="uploadUsn" class="form-control" placeholder="e.g. 1MS21CS001" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="uploadName">Student Full Name *</label>
+                        <input type="text" id="uploadName" class="form-control" placeholder="e.g. Rahul Sharma" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="uploadDept">Department / Course *</label>
+                        <input type="text" id="uploadDept" class="form-control" placeholder="e.g. Computer Science" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="uploadTitle">Document Title (Optional)</label>
+                        <input type="text" id="uploadTitle" class="form-control" placeholder="e.g. 1st Sem Grade Card, Degree Certificate">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="uploadFile">Select PDF File *</label>
+                        <input type="file" id="uploadFile" class="form-control" accept="application/pdf" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('uploadModal')">Cancel</button>
+                    <button type="submit" id="uploadSubmitBtn" class="btn btn-primary"><i class="fa-solid fa-upload"></i> Upload Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-<h3>Total Students</h3>
+    <!-- ================= Edit / Rename Metadata Modal ================= -->
+    <div id="editModal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen-to-square" style="color: var(--warning);"></i> Edit Student / Rename Document</h3>
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('editModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="editForm" onsubmit="handleEditSubmit(event)">
+                <input type="hidden" id="editDocId">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="editUsn">Student USN *</label>
+                        <input type="text" id="editUsn" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="editName">Student Name *</label>
+                        <input type="text" id="editName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="editDept">Department *</label>
+                        <input type="text" id="editDept" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="editTitle">Document Title / Display Name *</label>
+                        <input type="text" id="editTitle" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-<h1 id="totalStudents">0</h1>
+    <!-- ================= Replace PDF File Modal ================= -->
+    <div id="replaceModal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-arrows-rotate" style="color: var(--secondary);"></i> Replace PDF File</h3>
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('replaceModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="replaceForm" onsubmit="handleReplaceSubmit(event)">
+                <input type="hidden" id="replaceDocId">
+                <div class="modal-body">
+                    <div style="background: var(--light-bg); padding: 14px; border-radius: var(--radius-md); margin-bottom: 16px; font-size: 0.9rem;">
+                        <strong>Target Document:</strong> <span id="replaceTargetName"></span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="replaceFile">Select New PDF File *</label>
+                        <input type="file" id="replaceFile" class="form-control" accept="application/pdf" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('replaceModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Overwrite PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-</div>
+    <!-- ================= PDF Viewer Modal ================= -->
+    <div id="pdfModal" class="modal-backdrop">
+        <div class="modal" style="max-width: 900px; height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 id="pdfModalTitle"><i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> PDF Document Viewer</h3>
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('pdfModal')"><i class="fa-solid fa-xmark"></i> Close</button>
+            </div>
+            <div class="modal-body" style="flex: 1; padding: 0; background: #525659;">
+                <iframe id="pdfFrame" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+            <div class="modal-footer">
+                <a id="pdfModalDownloadBtn" href="#" download class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-download"></i> Download PDF
+                </a>
+            </div>
+        </div>
+    </div>
 
-<div class="card">
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
 
-<h3>Total Documents</h3>
-
-<h1 id="totalDocs">0</h1>
-
-</div>
-
-</div>
-
-<table>
-
-<thead>
-
-<tr>
-
-<th>USN</th>
-<th>Name</th>
-<th>Department</th>
-<th>Document</th>
-<th>Action</th>
-
-</tr>
-
-</thead>
-
-<tbody id="studentTable">
-
-</tbody>
-
-</table>
-
-</div>
-
-<script src="js/admin.js"></script>
-
+    <script src="js/admin.js"></script>
 </body>
-
 </html>
-<br>
-
-<input
-    type="text"
-    id="search"
-    placeholder="Search by USN, Name or Department..."
-    onkeyup="searchStudents()"
-    style="
-        width:100%;
-        padding:12px;
-        margin-bottom:20px;
-        border:1px solid #ccc;
-        border-radius:5px;
-    ">

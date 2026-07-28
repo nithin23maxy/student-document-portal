@@ -3,218 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Student Document Portal</title>
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
-        body {
-            background: #f4f6f9;
-            min-height: 100vh;
-        }
-
-        /* Navbar */
-        nav {
-            background: #2563eb;
-            color: white;
-            padding: 18px 50px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        nav h2 {
-            font-size: 24px;
-        }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin-left: 20px;
-        }
-
-        /* Hero Section */
-        .hero {
-            text-align: center;
-            padding: 80px 20px;
-        }
-
-        .hero h1 {
-            font-size: 42px;
-            color: #1e3a8a;
-            margin-bottom: 20px;
-        }
-
-        .hero p {
-            font-size: 18px;
-            color: #555;
-            margin-bottom: 30px;
-        }
-
-        .btn {
-            background: #2563eb;
-            color: white;
-            padding: 12px 30px;
-            border-radius: 8px;
-            border: none;
-            font-size: 16px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn:hover {
-            background: #1d4ed8;
-        }
-
-
-        /* Features */
-        .features {
-            display: flex;
-            justify-content: center;
-            gap: 25px;
-            flex-wrap: wrap;
-            padding: 30px;
-        }
-
-        .card {
-            background: white;
-            width: 280px;
-            padding: 25px;
-            text-align: center;
-            border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .card h3 {
-            color: #2563eb;
-            margin-bottom: 15px;
-        }
-
-        .card p {
-            color: #555;
-        }
-
-
-        /* Footer */
-        footer {
-            background: #111827;
-            color: white;
-            text-align: center;
-            padding: 15px;
-            margin-top: 50px;
-        }
-
-    </style>
-
+    <title>Student Document Portal - Quick Search & Access</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-
 <body>
 
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <i class="fa-solid fa-graduation-cap"></i>
+            <span>Student Document Portal</span>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-link active"><i class="fa-solid fa-house"></i> Home</a>
+            <a href="search.html" class="nav-link"><i class="fa-solid fa-magnifying-glass"></i> Student Search</a>
+            <a href="login.html" class="btn btn-outline btn-sm"><i class="fa-solid fa-lock"></i> Admin Login</a>
+        </div>
+    </header>
 
-<!-- Navigation -->
+    <!-- Main Hero Section -->
+    <main class="hero">
+        <div class="hero-badge">
+            <i class="fa-solid fa-shield-halved"></i> Secure Academic Repository
+        </div>
+        <h1>Access & Verify Student Documents</h1>
+        <p>Enter your Student USN or Roll Number below to quickly search, view, and download official documents.</p>
 
-<nav>
+        <!-- Search Box Form -->
+        <div class="search-card">
+            <form id="heroSearchForm" onsubmit="handleHeroSearch(event)">
+                <div class="search-input-group">
+                    <input type="text" id="heroUsnInput" class="search-input" placeholder="e.g. 1MS21CS001" required autocomplete="off">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-magnifying-glass"></i> Search Document
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
 
-    <h2>
-        Student Document Portal
-    </h2>
+    <!-- Feature Highlights -->
+    <section class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <h2 style="font-size: 2rem; margin-bottom: 8px;">Portal Features</h2>
+            <p style="color: var(--text-muted);">Designed for ease of access and secure management.</p>
+        </div>
 
-    <div>
-        <a href="index.html">Home</a>
-        <a href="login.html">Login</a>
-    </div>
+        <div class="documents-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            <div class="doc-card" style="text-align: center; align-items: center;">
+                <div class="pdf-icon" style="background: var(--primary-light); color: var(--primary); margin-bottom: 16px;">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <h3 style="margin-bottom: 8px;">Instant Access</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Students can retrieve their documents by searching their USN or opening shared direct links.</p>
+            </div>
 
-</nav>
+            <div class="doc-card" style="text-align: center; align-items: center;">
+                <div class="pdf-icon" style="background: #dcfce7; color: var(--success); margin-bottom: 16px;">
+                    <i class="fa-solid fa-file-pdf"></i>
+                </div>
+                <h3 style="margin-bottom: 8px;">High Quality PDFs</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">View certificates, transcripts, and mark sheets directly in the browser or download for print.</p>
+            </div>
 
+            <div class="doc-card" style="text-align: center; align-items: center;">
+                <div class="pdf-icon" style="background: #fef3c7; color: var(--warning); margin-bottom: 16px;">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <h3 style="margin-bottom: 8px;">Admin Managed</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Authorized Admin management ensures document authenticity while keeping student access strictly read-only.</p>
+            </div>
+        </div>
+    </section>
 
+    <!-- Footer -->
+    <footer style="margin-top: auto; padding: 24px; text-align: center; border-top: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.9rem;">
+        <p>&copy; 2026 Student Document Portal. All rights reserved.</p>
+    </footer>
 
-<!-- Main Section -->
-
-<section class="hero">
-
-    <h1>
-        Welcome to Student Document Portal
-    </h1>
-
-    <p>
-        Securely manage, upload and access your academic documents anytime.
-    </p>
-
-
-    <a href="login.html" class="btn">
-        Login
-    </a>
-
-
-</section>
-
-
-
-<!-- Features -->
-
-<section class="features">
-
-
-    <div class="card">
-
-        <h3>
-            Upload Documents
-        </h3>
-
-        <p>
-            Upload certificates, marks cards and important academic files securely.
-        </p>
-
-    </div>
-
-
-
-    <div class="card">
-
-        <h3>
-            Easy Access
-        </h3>
-
-        <p>
-            Access your documents anytime from anywhere.
-        </p>
-
-    </div>
-
-
-
-    <div class="card">
-
-        <h3>
-            Secure Storage
-        </h3>
-
-        <p>
-            Your documents are stored safely with database protection.
-        </p>
-
-    </div>
-
-
-</section>
-
-
-
-<footer>
-
-    <p>
-        © 2026 Student Document Portal | Developed by Nithin R
-    </p>
-
-</footer>
-
-
+    <script>
+        function handleHeroSearch(e) {
+            e.preventDefault();
+            const usn = document.getElementById("heroUsnInput").value.trim();
+            if (usn) {
+                window.location.href = `search.html?usn=${encodeURIComponent(usn)}`;
+            }
+        }
+    </script>
 </body>
 </html>

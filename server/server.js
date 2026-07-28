@@ -4,156 +4,68 @@ const path = require("path");
 const session = require("express-session");
 
 const db = require("./database.js");
+const authRoutes = require("./routes/authRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 const app = express();
-// Middleware
 
+// Enable CORS & Body Parsers
 app.use(cors());
-
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(express.urlencoded({ 
-    extended: true 
-}));
-
-
-// Session
-
+// Express Session
 app.use(session({
-
-    secret: "student-document-secret",
-
+    secret: "student-document-portal-secret-key-2026",
     resave: false,
-
-    saveUninitialized: true
-
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        httpOnly: true
+    }
 }));
 
+// Serve uploaded PDF files statically
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-
-// Serve frontend
-
+// Serve frontend client static files
 app.use(express.static(path.join(__dirname, "../client")));
 
+// API Route Mounts
+app.use("/api/auth", authRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/student", studentRoutes);
 
-
-// Test route
-
+// Test Route
 app.get("/api/test", (req, res) => {
-
-    res.json({
-
-        message: "Server working"
-
-    });
-
+    res.json({ success: true, message: "Student Document Portal Server is Running" });
 });
 
-
-
-// Login API
-
-app.post("/login", (req, res) => {
-
-
-    const { email, password } = req.body;
-
-
-    console.log("Login attempt:");
-
-    console.log("Email:", email);
-
-
-
-    // Demo login
-
-    if(email === "admin@gmail.com" && password === "admin123") {
-
-
-        req.session.user = {
-
-            email: email
-
-        };
-
-
-        return res.json({
-
-            success: true,
-
-            message: "Login successful"
-
-        });
-
-
-    }
-
-
-
-    res.json({
-
-        success: false,
-
-        message: "Invalid email or password"
-
-    });
-
-
+// Legacy /login endpoint compatibility
+app.post("/login", (req, res, next) => {
+    req.url = "/api/auth/login";
+    app._router.handle(req, res, next);
 });
 
-
-
-// Dashboard route
-
-app.get("/dashboard.html", (req, res) => {
-
-
-    if(!req.session.user){
-
+// Protected page route check for admin.html
+app.get("/admin.html", (req, res, next) => {
+    if (!req.session || (!req.session.admin && !req.session.user)) {
         return res.redirect("/login.html");
-
     }
-
-
-    res.sendFile(
-        path.join(__dirname, "../client/dashboard.html")
-    );
-
-
+    next();
 });
 
-
-
-
-// Send index page
-
-// Send index page for unknown routes
-
+// SPA / Direct link fallback to client/index.html
 app.use((req, res) => {
-
-    res.sendFile(
-        path.join(__dirname, "../client/index.html")
-    );
-
+    res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
-
-
-// Server start
-
+// Server Listen
 const PORT = process.env.PORT || 3000;
-
-
 app.listen(PORT, () => {
-
-
-    console.log("====================================");
-
-    console.log(" Student Document Portal Started");
-
-    console.log(` http://localhost:${PORT}`);
-
-    console.log("====================================");
-
-
+    console.log("==================================================");
+    console.log(" 🎓 Student Document Portal Server Started");
+    console.log(` 🌐 Server URL: http://localhost:${PORT}`);
+    console.log("==================================================");
 });
