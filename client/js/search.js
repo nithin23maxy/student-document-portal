@@ -30,7 +30,9 @@ async function performSearch(usn) {
     `;
 
     try {
-        const response = await fetch(`/api/student/search/${encodeURIComponent(usn)}`);
+        const response = await fetch(`/api/student/search/${encodeURIComponent(usn)}`, {
+            headers: { "Bypass-Tunnel-Reminder": "true" }
+        });
         const data = await response.json();
 
         if (!data.success || !data.found) {

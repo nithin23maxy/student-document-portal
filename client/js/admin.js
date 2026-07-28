@@ -7,7 +7,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function checkAdminAuth() {
     try {
-        const res = await fetch("/api/auth/check");
+        const res = await fetch("/api/auth/check", {
+            headers: { "Bypass-Tunnel-Reminder": "true" }
+        });
         const data = await res.json();
         if (!data.authenticated) {
             window.location.href = "login.html";
@@ -20,7 +22,9 @@ async function checkAdminAuth() {
 
 async function loadDocuments() {
     try {
-        const res = await fetch("/api/documents");
+        const res = await fetch("/api/documents", {
+            headers: { "Bypass-Tunnel-Reminder": "true" }
+        });
         if (res.status === 401) {
             window.location.href = "login.html";
             return;
@@ -140,6 +144,9 @@ async function handleUploadSubmit(e) {
     try {
         const res = await fetch("/api/documents/upload", {
             method: "POST",
+            headers: {
+                "Bypass-Tunnel-Reminder": "true"
+            },
             body: formData
         });
 
@@ -186,7 +193,8 @@ async function handleEditSubmit(e) {
         const res = await fetch(`/api/documents/update/${id}`, {
             method: "PUT",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Bypass-Tunnel-Reminder": "true"
             },
             body: JSON.stringify({ usn, name, department, doc_title })
         });
@@ -233,6 +241,9 @@ async function handleReplaceSubmit(e) {
     try {
         const res = await fetch(`/api/documents/replace/${id}`, {
             method: "POST",
+            headers: {
+                "Bypass-Tunnel-Reminder": "true"
+            },
             body: formData
         });
 
@@ -258,7 +269,10 @@ async function confirmDeleteDocument(id, title) {
 
     try {
         const res = await fetch(`/api/documents/delete/${id}`, {
-            method: "DELETE"
+            method: "DELETE",
+            headers: {
+                "Bypass-Tunnel-Reminder": "true"
+            }
         });
 
         const data = await res.json();
@@ -292,7 +306,12 @@ function openViewPdfModal(filepath, title, filename) {
 async function handleLogout() {
     if (!confirm("Are you sure you want to log out?")) return;
     try {
-        await fetch("/api/auth/logout", { method: "POST" });
+        await fetch("/api/auth/logout", {
+            method: "POST",
+            headers: {
+                "Bypass-Tunnel-Reminder": "true"
+            }
+        });
         window.location.href = "login.html";
     } catch (e) {
         window.location.href = "login.html";

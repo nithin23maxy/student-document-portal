@@ -1,7 +1,9 @@
 document.addEventListener("DOMContentLoaded", async () => {
     // Check if session already exists
     try {
-        const res = await fetch("/api/auth/check");
+        const res = await fetch("/api/auth/check", {
+            headers: { "Bypass-Tunnel-Reminder": "true" }
+        });
         const data = await res.json();
         if (data.authenticated) {
             window.location.href = "admin.html";
@@ -30,7 +32,8 @@ async function handleLogin(e) {
         const response = await fetch("/api/auth/login", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Bypass-Tunnel-Reminder": "true"
             },
             body: JSON.stringify({ username, password })
         });

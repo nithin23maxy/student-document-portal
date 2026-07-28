@@ -1,7 +1,9 @@
 document.addEventListener("DOMContentLoaded", async () => {
     // Session Auth Check
     try {
-        const res = await fetch("/api/auth/check");
+        const res = await fetch("/api/auth/check", {
+            headers: { "Bypass-Tunnel-Reminder": "true" }
+        });
         const data = await res.json();
         if (!data.authenticated) {
             window.location.href = "login.html";
@@ -27,6 +29,9 @@ if (form) {
         try {
             const response = await fetch("/api/documents/upload", {
                 method: "POST",
+                headers: {
+                    "Bypass-Tunnel-Reminder": "true"
+                },
                 body: formData
             });
 
