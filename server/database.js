@@ -40,6 +40,14 @@ function initTables() {
             )
         `);
 
+        // Migration: ensure columns doc_title & file_size exist if table was created earlier
+        db.run("ALTER TABLE students ADD COLUMN doc_title TEXT DEFAULT 'Document'", (err) => {
+            // Ignored if column already exists
+        });
+        db.run("ALTER TABLE students ADD COLUMN file_size INTEGER DEFAULT 0", (err) => {
+            // Ignored if column already exists
+        });
+
         // Admins table
         db.run(`
             CREATE TABLE IF NOT EXISTS admins (
@@ -72,4 +80,4 @@ function initTables() {
     });
 }
 
-module.exports = db;
+module.exports = db;

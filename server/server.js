@@ -35,7 +35,9 @@ app.use(express.static(path.join(__dirname, "../client")));
 // API Route Mounts
 app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/document", documentRoutes); // Singular alias compatibility
 app.use("/api/student", studentRoutes);
+app.use("/api/students", documentRoutes); // Students list alias compatibility
 
 // Test Route
 app.get("/api/test", (req, res) => {
