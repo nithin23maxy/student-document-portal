@@ -1,0 +1,5 @@
+node_modules/
+server/uploads/
+server/database/*.db
+server/controllers/.env
+.env

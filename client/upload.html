@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Student Document</title>
+
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:Arial, Helvetica, sans-serif;
+        }
+
+        body{
+            background:#f4f6f9;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            height:100vh;
+        }
+
+        .container{
+            background:white;
+            width:420px;
+            padding:30px;
+            border-radius:10px;
+            box-shadow:0 0 15px rgba(0,0,0,.2);
+        }
+
+        h2{
+            text-align:center;
+            margin-bottom:20px;
+            color:#333;
+        }
+
+        input{
+            width:100%;
+            padding:10px;
+            margin:10px 0;
+            border:1px solid #ccc;
+            border-radius:5px;
+        }
+
+        button{
+            width:100%;
+            padding:12px;
+            background:#007bff;
+            color:white;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+            font-size:16px;
+        }
+
+        button:hover{
+            background:#0056b3;
+        }
+
+        #msg{
+            margin-top:15px;
+            text-align:center;
+            font-weight:bold;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>Upload Student Document</h2>
+
+<form id="uploadForm" enctype="multipart/form-data">
+
+<input
+type="text"
+name="usn"
+placeholder="Enter USN"
+required>
+
+<input
+type="text"
+name="name"
+placeholder="Student Name"
+required>
+
+<input
+type="text"
+name="department"
+placeholder="Department"
+required>
+
+<input
+type="file"
+name="pdf"
+accept=".pdf"
+required>
+
+<button type="submit">
+Upload PDF
+</button>
+
+</form>
+
+<p id="msg"></p>
+
+</div>
+
+<script src="js/upload.js"></script>
+
+</body>
+
+</html>

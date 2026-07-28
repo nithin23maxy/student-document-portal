@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Admin Dashboard</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+display:flex;
+background:#f4f6f9;
+}
+
+.sidebar{
+width:240px;
+height:100vh;
+background:#1e3a8a;
+color:white;
+padding:20px;
+}
+
+.sidebar h2{
+text-align:center;
+margin-bottom:30px;
+}
+
+.sidebar a{
+display:block;
+padding:12px;
+margin:10px 0;
+color:white;
+text-decoration:none;
+border-radius:5px;
+}
+
+.sidebar a:hover{
+background:#2563eb;
+}
+
+.main{
+flex:1;
+padding:30px;
+}
+
+.cards{
+display:flex;
+gap:20px;
+margin-bottom:30px;
+}
+
+.card{
+flex:1;
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 10px rgba(0,0,0,.1);
+text-align:center;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+}
+
+th,td{
+padding:12px;
+border:1px solid #ddd;
+text-align:center;
+}
+
+th{
+background:#2563eb;
+color:white;
+}
+
+button{
+padding:8px 15px;
+border:none;
+border-radius:5px;
+cursor:pointer;
+}
+
+.view{
+background:green;
+color:white;
+}
+
+.delete{
+background:red;
+color:white;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>Admin</h2>
+
+<a href="admin.html">Dashboard</a>
+<a href="upload.html">Upload PDF</a>
+<a href="#">Students</a>
+<a href="#">Search</a>
+<a href="index.html">Logout</a>
+
+</div>
+
+<div class="main">
+
+<h1>Student Document Portal</h1>
+
+<br>
+
+<div class="cards">
+
+<div class="card">
+
+<h3>Total Students</h3>
+
+<h1 id="totalStudents">0</h1>
+
+</div>
+
+<div class="card">
+
+<h3>Total Documents</h3>
+
+<h1 id="totalDocs">0</h1>
+
+</div>
+
+</div>
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>USN</th>
+<th>Name</th>
+<th>Department</th>
+<th>Document</th>
+<th>Action</th>
+
+</tr>
+
+</thead>
+
+<tbody id="studentTable">
+
+</tbody>
+
+</table>
+
+</div>
+
+<script src="js/admin.js"></script>
+
+</body>
+
+</html>
+<br>
+
+<input
+    type="text"
+    id="search"
+    placeholder="Search by USN, Name or Department..."
+    onkeyup="searchStudents()"
+    style="
+        width:100%;
+        padding:12px;
+        margin-bottom:20px;
+        border:1px solid #ccc;
+        border-radius:5px;
+    ">

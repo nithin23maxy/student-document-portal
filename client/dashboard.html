@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<h1>Student Document Portal</h1>
+
+<div class="container">
+
+<h2>Upload Student Document</h2>
+
+<form id="uploadForm" enctype="multipart/form-data">
+
+<input type="text" name="usn" placeholder="USN" required>
+
+<input type="text" name="name" placeholder="Student Name" required>
+
+<input type="text" name="department" placeholder="Department" required>
+
+<input type="file" name="pdf" accept=".pdf" required>
+
+<button type="submit">Upload PDF</button>
+
+</form>
+
+<p id="msg"></p>
+
+</div>
+
+<script src="js/upload.js"></script>
+
+</body>
+</html>
