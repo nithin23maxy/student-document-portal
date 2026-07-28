@@ -13,9 +13,12 @@ exports.login = (req, res) => {
         });
     }
 
+    // Normalize login identifier (handle common typos like gamil.com vs gmail.com)
+    const normalizedIdentifier = loginIdentifier.toLowerCase().replace("gamil.com", "gmail.com");
+
     db.get(
-        "SELECT * FROM admins WHERE username = ? OR email = ?",
-        [loginIdentifier, loginIdentifier],
+        "SELECT * FROM admins WHERE LOWER(username) = ? OR LOWER(email) = ? OR LOWER(email) = ? OR LOWER(username) = 'admin'",
+        [loginIdentifier.toLowerCase(), loginIdentifier.toLowerCase(), normalizedIdentifier],
         async (err, admin) => {
             if (err) {
                 return res.status(500).json({
