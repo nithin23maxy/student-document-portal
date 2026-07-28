@@ -3,11 +3,9 @@ const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
 
-const db = require("./database/db");
+const db = require("./database.js");
 
 const app = express();
-
-
 // Middleware
 
 app.use(cors());
@@ -129,14 +127,15 @@ app.get("/dashboard.html", (req, res) => {
 
 // Send index page
 
-app.get("/*", (req, res) => {
+// Send index page for unknown routes
+
+app.use((req, res) => {
 
     res.sendFile(
         path.join(__dirname, "../client/index.html")
     );
 
 });
-
 
 
 
