@@ -1,128 +1,160 @@
 const express = require("express");
-const path = require("path");
 const cors = require("cors");
+const path = require("path");
+const session = require("express-session");
 
-// Database
-const db = require("./database");
-
-// Routes
-const authRoutes = require("./routes/authRoutes");
-const documentRoutes = require("./routes/documentRoutes");
-const studentRoutes = require("./routes/studentRoutes");
+const db = require("./database/db");
 
 const app = express();
 
-// =====================================
-// Middleware
-// =====================================
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// =====================================
-// Static Files
-// =====================================
+// Middleware
+
+app.use(cors());
+
+app.use(express.json());
+
+app.use(express.urlencoded({ 
+    extended: true 
+}));
+
+
+// Session
+
+app.use(session({
+
+    secret: "student-document-secret",
+
+    resave: false,
+
+    saveUninitialized: true
+
+}));
+
+
+
+// Serve frontend
+
 app.use(express.static(path.join(__dirname, "../client")));
 
-// Serve uploaded PDFs
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// =====================================
-// API Routes
-// =====================================
-app.use("/api/auth", authRoutes);
-app.use("/api/document", documentRoutes);
-app.use("/api/student", studentRoutes);
 
-// =====================================
-// Home
-// =====================================
-app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "../client/index.html"));
-});
+// Test route
 
-// =====================================
-// Test API
-// =====================================
 app.get("/api/test", (req, res) => {
+
     res.json({
-        success: true,
-        message: "Student Document Portal Server Running Successfully 🚀"
+
+        message: "Server working"
+
     });
+
 });
 
-// =====================================
-// Database Check
-// =====================================
-app.get("/api/database", (req, res) => {
 
-    db.get("SELECT sqlite_version() AS version", (err, row) => {
 
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                message: err.message
-            });
-        }
+// Login API
 
-        res.json({
+app.post("/login", (req, res) => {
+
+
+    const { email, password } = req.body;
+
+
+    console.log("Login attempt:");
+
+    console.log("Email:", email);
+
+
+
+    // Demo login
+
+    if(email === "admin@gmail.com" && password === "admin123") {
+
+
+        req.session.user = {
+
+            email: email
+
+        };
+
+
+        return res.json({
+
             success: true,
-            message: "SQLite Connected Successfully",
-            sqliteVersion: row.version
+
+            message: "Login successful"
+
         });
 
-    });
 
-});
+    }
 
-// =====================================
-// Health Check
-// =====================================
-app.get("/health", (req, res) => {
+
+
     res.json({
-        success: true,
-        status: "Server Running"
-    });
-});
-// ================= View All Students =================
-app.get("/api/students", (req, res) => {
 
-    db.all("SELECT * FROM students", (err, rows) => {
-
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                message: err.message
-            });
-        }
-
-        res.json({
-            success: true,
-            students: rows
-        });
-
-    });
-
-});
-
-// =====================================
-// 404 Handler
-// =====================================
-app.use((req, res) => {
-    res.status(404).json({
         success: false,
-        message: "Route Not Found"
+
+        message: "Invalid email or password"
+
     });
+
+
 });
 
-// =====================================
-// Start Server
-// =====================================
+
+
+// Dashboard route
+
+app.get("/dashboard.html", (req, res) => {
+
+
+    if(!req.session.user){
+
+        return res.redirect("/login.html");
+
+    }
+
+
+    res.sendFile(
+        path.join(__dirname, "../client/dashboard.html")
+    );
+
+
+});
+
+
+
+
+// Send index page
+
+app.get("/*", (req, res) => {
+
+    res.sendFile(
+        path.join(__dirname, "../client/index.html")
+    );
+
+});
+
+
+
+
+// Server start
+
 const PORT = process.env.PORT || 3000;
 
+
 app.listen(PORT, () => {
+
+
     console.log("====================================");
+
     console.log(" Student Document Portal Started");
+
     console.log(` http://localhost:${PORT}`);
+
     console.log("====================================");
+
+
 });
