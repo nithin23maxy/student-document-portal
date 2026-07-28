@@ -3,56 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Student Document Portal</title>
 
     <style>
-        body {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 100px;
+        }
+
+        body {
             background: #f4f6f9;
+            min-height: 100vh;
         }
 
-        .box {
-            background: white;
-            padding: 30px;
-            width: 400px;
-            margin: auto;
-            border-radius: 10px;
-            box-shadow: 0 0 10px gray;
-        }
-
-        h1 {
-            color: #2563eb;
-        }
-
-        button {
-            padding: 10px 20px;
+        /* Navbar */
+        nav {
             background: #2563eb;
             color: white;
-            border: none;
-            border-radius: 5px;
+            padding: 18px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+
+        nav h2 {
+            font-size: 24px;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 80px 20px;
+        }
+
+        .hero h1 {
+            font-size: 42px;
+            color: #1e3a8a;
+            margin-bottom: 20px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background: #1d4ed8;
+        }
+
+
+        /* Features */
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            flex-wrap: wrap;
+            padding: 30px;
+        }
+
+        .card {
+            background: white;
+            width: 280px;
+            padding: 25px;
+            text-align: center;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+
+        .card p {
+            color: #555;
+        }
+
+
+        /* Footer */
+        footer {
+            background: #111827;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            margin-top: 50px;
+        }
+
     </style>
+
 </head>
 
 <body>
 
-<div class="box">
 
-    <h1>Student Document Portal</h1>
+<!-- Navigation -->
+
+<nav>
+
+    <h2>
+        Student Document Portal
+    </h2>
+
+    <div>
+        <a href="index.html">Home</a>
+        <a href="login.html">Login</a>
+    </div>
+
+</nav>
+
+
+
+<!-- Main Section -->
+
+<section class="hero">
+
+    <h1>
+        Welcome to Student Document Portal
+    </h1>
 
     <p>
-        Welcome to the Student Document Management System
+        Securely manage, upload and access your academic documents anytime.
     </p>
 
-   <a href="login.html">
-    <button>
-        Login
-    </button>
-</a>
 
-</div>
+    <a href="login.html" class="btn">
+        Login
+    </a>
+
+
+</section>
+
+
+
+<!-- Features -->
+
+<section class="features">
+
+
+    <div class="card">
+
+        <h3>
+            Upload Documents
+        </h3>
+
+        <p>
+            Upload certificates, marks cards and important academic files securely.
+        </p>
+
+    </div>
+
+
+
+    <div class="card">
+
+        <h3>
+            Easy Access
+        </h3>
+
+        <p>
+            Access your documents anytime from anywhere.
+        </p>
+
+    </div>
+
+
+
+    <div class="card">
+
+        <h3>
+            Secure Storage
+        </h3>
+
+        <p>
+            Your documents are stored safely with database protection.
+        </p>
+
+    </div>
+
+
+</section>
+
+
+
+<footer>
+
+    <p>
+        © 2026 Student Document Portal | Developed by Nithin R
+    </p>
+
+</footer>
+
 
 </body>
 </html>
