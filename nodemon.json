@@ -1,11 +1,12 @@
 {
-  "watch": ["server", "client"],
+  "watch": ["server"],
   "ignore": [
     "server/uploads/**",
     "server/database/**",
     "*.db",
     "*.db-journal",
-    "*.db-wal"
+    "*.db-wal",
+    "client/**"
   ],
-  "ext": "js,html,css,json"
+  "ext": "js,json"
 }

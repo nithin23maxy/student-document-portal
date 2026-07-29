@@ -46,6 +46,18 @@ function initTables() {
         db.run("ALTER TABLE students ADD COLUMN file_size INTEGER DEFAULT 0", (err) => {});
         db.run("ALTER TABLE students ADD COLUMN file_data BLOB", (err) => {});
 
+        // Persistent Sessions table for Express Session Store
+        db.run(`
+            CREATE TABLE IF NOT EXISTS sessions (
+                sid TEXT PRIMARY KEY,
+                sess TEXT NOT NULL,
+                expire INTEGER NOT NULL
+            )
+        `, () => {
+            // Prune expired sessions on boot
+            db.run("DELETE FROM sessions WHERE expire <= ?", [Date.now()], () => {});
+        });
+
         // Backfill missing file_data BLOB from disk uploads directory for existing rows
         db.all("SELECT id, filepath FROM students WHERE file_data IS NULL", [], (err, rows) => {
             if (!err && rows && rows.length > 0) {
@@ -121,23 +133,31 @@ function syncOrphanedDiskFiles() {
     try {
         const filesOnDisk = fs.readdirSync(uploadDir).filter(f => f.toLowerCase().endsWith(".pdf"));
 
-        db.all("SELECT filepath, file_data, filename FROM students", [], (err, rows) => {
+        // Only SELECT lightweight metadata (exclude BLOBs to save memory)
+        db.all("SELECT id, filepath, filename FROM students", [], (err, rows) => {
             if (err || !rows) return;
 
             const registeredFilepaths = new Set(rows.map(r => r.filepath));
 
-            // Restore any disk files missing from disk but present in file_data BLOB
+            // Restore any disk files missing from disk but present in DB file_data BLOB
             rows.forEach(r => {
-                if (r.filepath && r.file_data) {
+                if (r.filepath) {
                     const diskPath = path.join(uploadDir, r.filepath);
                     if (!fs.existsSync(diskPath)) {
-                        try {
-                            const buf = Buffer.isBuffer(r.file_data) ? r.file_data : Buffer.from(r.file_data, "base64");
-                            fs.writeFileSync(diskPath, buf);
-                            console.log(`⚡ Auto-restored missing disk file from database: ${r.filepath}`);
-                        } catch (e) {
-                            console.warn("Failed auto-restoring disk file:", r.filepath, e.message);
-                        }
+                        // Fetch BLOB on-demand only for this specific missing file
+                        db.get("SELECT file_data FROM students WHERE id = ?", [r.id], (bErr, bRow) => {
+                            if (!bErr && bRow && bRow.file_data) {
+                                try {
+                                    const buf = Buffer.isBuffer(bRow.file_data)
+                                        ? bRow.file_data
+                                        : Buffer.from(bRow.file_data, "base64");
+                                    fs.writeFileSync(diskPath, buf);
+                                    console.log(`⚡ Auto-restored missing disk file from database: ${r.filepath}`);
+                                } catch (e) {
+                                    console.warn("Failed auto-restoring disk file:", r.filepath, e.message);
+                                }
+                            }
+                        });
                     }
                 }
             });

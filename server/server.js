@@ -2,10 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const session = require("express-session");
-const MemoryStore = require("memorystore")(session);
 const fs = require("fs");
 
 const db = require("./database.js");
+const SQLiteSessionStore = require("./sessionStore.js");
 const authRoutes = require("./routes/authRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const studentRoutes = require("./routes/studentRoutes");
@@ -20,16 +20,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Production-ready Session Store (prevents memory leaks & MemoryStore warning on deployment)
+// Persistent SQLite Session Store (keeps admin logged in across server restarts)
 app.use(session({
-    store: new MemoryStore({
-        checkPeriod: 24 * 60 * 60 * 1000 // Prune expired entries every 24 hours
-    }),
+    store: new SQLiteSessionStore(db),
     secret: process.env.SESSION_SECRET || "student-document-portal-secret-key-2026",
     resave: false,
     saveUninitialized: false,
     cookie: {
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days persistent login
         httpOnly: true
     }
 }));

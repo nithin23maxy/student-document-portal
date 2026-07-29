@@ -1,8 +1,16 @@
 let documentsData = [];
+let autoRefreshInterval = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     await checkAdminAuth();
     await loadDocuments();
+
+    // Auto-refresh documents periodically to keep table live
+    if (!autoRefreshInterval) {
+        autoRefreshInterval = setInterval(() => {
+            loadDocuments(true);
+        }, 15000);
+    }
 });
 
 async function checkAdminAuth() {
@@ -16,11 +24,18 @@ async function checkAdminAuth() {
         }
     } catch (e) {
         console.error("Auth check failed:", e);
-        window.location.href = "login.html";
+        // Retry auth check before redirecting
+        setTimeout(async () => {
+            try {
+                const r = await fetch("/api/auth/check", { headers: { "Bypass-Tunnel-Reminder": "true" } });
+                const d = await r.json();
+                if (!d.authenticated) window.location.href = "login.html";
+            } catch (err) {}
+        }, 2000);
     }
 }
 
-async function loadDocuments() {
+async function loadDocuments(isSilent = false) {
     try {
         const res = await fetch("/api/documents", {
             headers: { "Bypass-Tunnel-Reminder": "true" }
@@ -35,12 +50,29 @@ async function loadDocuments() {
             documentsData = data.documents || [];
             updateStats(documentsData);
             renderTable(documentsData);
-        } else {
+        } else if (!isSilent) {
             showToast(data.message || "Failed to load documents.", "error");
         }
     } catch (err) {
         console.error("Error loading documents:", err);
-        showToast("Server error while loading documents.", "error");
+        if (!isSilent && (!documentsData || documentsData.length === 0)) {
+            const tbody = document.getElementById("adminTableBody");
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--warning); padding: 30px;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.8rem; margin-bottom: 8px;"></i><br>
+                            Connecting to portal server...<br>
+                            <button type="button" class="btn btn-outline btn-sm" style="margin-top: 10px;" onclick="loadDocuments()">
+                                <i class="fa-solid fa-arrows-rotate"></i> Retry Now
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        // Auto-retry in 3 seconds
+        setTimeout(() => loadDocuments(true), 3000);
     }
 }
 
