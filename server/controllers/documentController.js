@@ -67,57 +67,32 @@ exports.uploadDocument = (req, res) => {
     const storedFilename = req.file.filename;
     const fileSize = req.file.size || 0;
 
-    let fileBuffer = null;
-    // Store binary BLOB in SQLite for auto-restoring backup (up to 30MB)
-    if (req.file.path && fs.existsSync(req.file.path) && fileSize <= 30 * 1024 * 1024) {
-        try {
-            fileBuffer = fs.readFileSync(req.file.path);
-        } catch (e) {
-            console.warn("Could not read uploaded file to buffer:", e.message);
-        }
-    }
+    const insertQuery = `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
+    const params = [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
 
-    const insertWithFallback = (includeBuffer) => {
-        const query = includeBuffer
-            ? `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-            : `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-               VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
-
-        const params = includeBuffer
-            ? [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBuffer]
-            : [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
-
-        db.run(query, params, function (err) {
-            if (err) {
-                if (includeBuffer && fileBuffer) {
-                    console.warn("BLOB DB insert failed, retrying without file_data payload:", err.message);
-                    return insertWithFallback(false);
-                }
-
-                console.error("Database Insert Error:", err.message);
-                return res.status(500).json({
-                    success: false,
-                    message: "Database insertion failed: " + err.message
-                });
-            }
-
-            // Sync student name & department across all existing documents for this USN for consistency
-            db.run(
-                "UPDATE students SET name = ?, department = ? WHERE UPPER(usn) = ?",
-                [cleanName, cleanDept, cleanUsn],
-                (updateErr) => {}
-            );
-
-            res.status(201).json({
-                success: true,
-                message: "PDF Document uploaded successfully!",
-                id: this.lastID
+    db.run(insertQuery, params, function (err) {
+        if (err) {
+            console.error("Database Insert Error:", err.message);
+            return res.status(500).json({
+                success: false,
+                message: "Database insertion failed: " + err.message
             });
-        });
-    };
+        }
 
-    insertWithFallback(Boolean(fileBuffer));
+        // Sync student name & department across all existing documents for this USN for consistency
+        db.run(
+            "UPDATE students SET name = ?, department = ? WHERE UPPER(usn) = ?",
+            [cleanName, cleanDept, cleanUsn],
+            () => {}
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "PDF Document uploaded successfully!",
+            id: this.lastID
+        });
+    });
 };
 
 // ================= Update Student / Document Metadata =================
@@ -211,47 +186,23 @@ exports.replacePDF = (req, res) => {
         const newOriginalName = req.file.originalname || "document.pdf";
         const newStoredFilename = req.file.filename;
         const newFileSize = req.file.size || 0;
-        let newFileBuffer = null;
-        if (req.file.path && fs.existsSync(req.file.path) && newFileSize <= 30 * 1024 * 1024) {
-            try {
-                newFileBuffer = fs.readFileSync(req.file.path);
-            } catch (e) {
-                console.warn("Could not read replacement file to buffer:", e.message);
-            }
-        }
 
-        const updateWithFallback = (includeBuffer) => {
-            const query = includeBuffer
-                ? `UPDATE students
-                   SET filename = ?, filepath = ?, file_size = ?, file_data = ?
-                   WHERE id = ?`
-                : `UPDATE students
-                   SET filename = ?, filepath = ?, file_size = ?, file_data = NULL
-                   WHERE id = ?`;
-
-            const params = includeBuffer
-                ? [newOriginalName, newStoredFilename, newFileSize, newFileBuffer, id]
-                : [newOriginalName, newStoredFilename, newFileSize, id];
-
-            db.run(query, params, function (err) {
-                if (err) {
-                    if (includeBuffer && newFileBuffer) {
-                        return updateWithFallback(false);
-                    }
-                    return res.status(500).json({
-                        success: false,
-                        message: err.message
-                    });
-                }
-
-                res.json({
-                    success: true,
-                    message: "PDF File replaced successfully!"
+        const updateQuery = `UPDATE students
+                             SET filename = ?, filepath = ?, file_size = ?, file_data = NULL
+                             WHERE id = ?`;
+        db.run(updateQuery, [newOriginalName, newStoredFilename, newFileSize, id], function (err) {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    message: err.message
                 });
-            });
-        };
+            }
 
-        updateWithFallback(Boolean(newFileBuffer));
+            res.json({
+                success: true,
+                message: "PDF File replaced successfully!"
+            });
+        });
     });
 };
 
@@ -361,7 +312,7 @@ exports.bulkUploadDocuments = async (req, res) => {
     const defaultDept = (req.body.defaultDepartment || "Computer Science").trim();
 
     // Fetch existing students map for USN -> { name, department } lookup
-    db.all("SELECT UPPER(usn) as clean_usn, name, department FROM students", [], async (err, rows) => {
+    db.all("SELECT UPPER(usn) as clean_usn, name, department FROM students", [], (err, rows) => {
         const studentMap = new Map();
         if (!err && rows) {
             rows.forEach(r => {
@@ -374,47 +325,35 @@ exports.bulkUploadDocuments = async (req, res) => {
         let successCount = 0;
         let errorCount = 0;
         const results = [];
+        const updateUsns = new Set();
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const originalName = file.originalname || "document.pdf";
-            
-            // Check if metadata override passed from client preview table
-            let itemMeta = Array.isArray(parsedItems) ? parsedItems.find(p => p.originalname === originalName || p.index === i) : null;
-            let autoMeta = parseFilenameDetails(originalName, defaultDept);
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
 
-            let cleanUsn = itemMeta && itemMeta.usn ? itemMeta.usn.trim().toUpperCase() : autoMeta.usn;
-            let cleanDept = itemMeta && itemMeta.department ? itemMeta.department.trim() : autoMeta.department;
-            let cleanTitle = itemMeta && itemMeta.doc_title ? itemMeta.doc_title.trim() : autoMeta.doc_title;
-            let cleanName = itemMeta && itemMeta.name ? itemMeta.name.trim() : autoMeta.name;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const originalName = file.originalname || "document.pdf";
+                
+                let itemMeta = Array.isArray(parsedItems) ? parsedItems.find(p => p.originalname === originalName || p.index === i) : null;
+                let autoMeta = parseFilenameDetails(originalName, defaultDept);
 
-            // If student USN already exists in database, keep existing student name and department
-            if (studentMap.has(cleanUsn)) {
-                const existing = studentMap.get(cleanUsn);
-                cleanName = existing.name;
-                cleanDept = existing.department;
-            }
+                let cleanUsn = itemMeta && itemMeta.usn ? itemMeta.usn.trim().toUpperCase() : autoMeta.usn;
+                let cleanDept = itemMeta && itemMeta.department ? itemMeta.department.trim() : autoMeta.department;
+                let cleanTitle = itemMeta && itemMeta.doc_title ? itemMeta.doc_title.trim() : autoMeta.doc_title;
+                let cleanName = itemMeta && itemMeta.name ? itemMeta.name.trim() : autoMeta.name;
 
-            const storedFilename = file.filename;
-            const fileSize = file.size || 0;
+                if (studentMap.has(cleanUsn)) {
+                    const existing = studentMap.get(cleanUsn);
+                    cleanName = existing.name;
+                    cleanDept = existing.department;
+                }
 
-            let fileBuffer = null;
-            if (file.path && fs.existsSync(file.path) && fileSize <= 50 * 1024 * 1024) {
-                try {
-                    fileBuffer = fs.readFileSync(file.path);
-                } catch (e) {}
-            }
+                const storedFilename = file.filename;
+                const fileSize = file.size || 0;
 
-            await new Promise((resolve) => {
-                const insertQuery = fileBuffer
-                    ? `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-                    : `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
-
-                const params = fileBuffer
-                    ? [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBuffer]
-                    : [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
+                const insertQuery = `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+                                     VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
+                const params = [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
 
                 db.run(insertQuery, params, function (dbErr) {
                     if (dbErr) {
@@ -425,22 +364,29 @@ exports.bulkUploadDocuments = async (req, res) => {
                         successCount++;
                         studentMap.set(cleanUsn, { name: cleanName, department: cleanDept });
                         results.push({ filename: originalName, usn: cleanUsn, title: cleanTitle, success: true, id: this.lastID });
-
-                        // Sync name and department for all documents with this USN
-                        db.run("UPDATE students SET name = ?, department = ? WHERE UPPER(usn) = ?", [cleanName, cleanDept, cleanUsn], () => {});
+                        updateUsns.add(cleanUsn);
                     }
-                    resolve();
+                });
+            }
+
+            db.run("COMMIT", () => {
+                // Sync name & department for modified USNs
+                updateUsns.forEach((usn) => {
+                    const info = studentMap.get(usn);
+                    if (info) {
+                        db.run("UPDATE students SET name = ?, department = ? WHERE UPPER(usn) = ?", [info.name, info.department, usn], () => {});
+                    }
+                });
+
+                res.json({
+                    success: true,
+                    message: `Successfully processed ${successCount} document(s). ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
+                    total: files.length,
+                    successCount,
+                    errorCount,
+                    results
                 });
             });
-        }
-
-        res.json({
-            success: true,
-            message: `Successfully processed ${successCount} document(s). ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
-            total: files.length,
-            successCount,
-            errorCount,
-            results
         });
     });
 };

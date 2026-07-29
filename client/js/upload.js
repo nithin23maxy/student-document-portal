@@ -69,45 +69,56 @@ if (form) {
 
         const formData = new FormData(form);
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading PDF...`;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading 0%...`;
         msg.textContent = "";
 
-        try {
-            const response = await fetch("/api/documents/upload", {
-                method: "POST",
-                headers: {
-                    "Bypass-Tunnel-Reminder": "true"
-                },
-                body: formData
-            });
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/documents/upload", true);
+        xhr.setRequestHeader("Bypass-Tunnel-Reminder", "true");
 
-            if (response.status === 401) {
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${percent}%...`;
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 401) {
                 showMsg("Session expired. Redirecting to login...", "error");
                 setTimeout(() => { window.location.href = "login.html"; }, 1500);
                 return;
             }
 
-            const data = await response.json();
-
-            if (data.success) {
-                showMsg(data.message || "PDF uploaded successfully!", "success");
-                form.reset();
-                const fileInfoBox = document.getElementById("fileInfoBox");
-                if (fileInfoBox) fileInfoBox.style.display = "none";
-                setTimeout(() => {
-                    window.location.href = "admin.html";
-                }, 1200);
-            } else {
-                showMsg(data.message || "Upload failed. Please try again.", "error");
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (data.success) {
+                    showMsg(data.message || "PDF uploaded successfully!", "success");
+                    form.reset();
+                    const fileInfoBox = document.getElementById("fileInfoBox");
+                    if (fileInfoBox) fileInfoBox.style.display = "none";
+                    setTimeout(() => {
+                        window.location.href = "admin.html";
+                    }, 1200);
+                } else {
+                    showMsg(data.message || "Upload failed. Please try again.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload Document`;
+                }
+            } catch (e) {
+                showMsg("Invalid server response.", "error");
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload Document`;
             }
-        } catch (err) {
-            console.error("Upload error:", err);
+        };
+
+        xhr.onerror = () => {
             showMsg("Connection error during upload. Please check server.", "error");
             submitBtn.disabled = false;
             submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload Document`;
-        }
+        };
+
+        xhr.send(formData);
     });
 }
 

@@ -19,7 +19,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
         console.log("❌ Database Error:", err.message);
     } else {
         console.log("✅ SQLite Connected");
-        initTables();
+        db.serialize(() => {
+            db.run("PRAGMA journal_mode = WAL;");
+            db.run("PRAGMA synchronous = NORMAL;");
+            db.run("PRAGMA temp_store = MEMORY;");
+            db.run("PRAGMA cache_size = -64000;");
+            initTables();
+        });
     }
 });
 
@@ -58,15 +64,6 @@ function initTables() {
             db.run("DELETE FROM sessions WHERE expire <= ?", [Date.now()], () => {});
         });
 
-        // Backfill missing file_data BLOB from disk uploads directory for existing rows
-        db.all("SELECT id, filepath FROM students WHERE file_data IS NULL", [], (err, rows) => {
-            if (!err && rows && rows.length > 0) {
-                rows.forEach(r => {
-                    backfillFileData(r.filepath);
-                });
-            }
-        });
-
         // Disk-to-DB Auto-Healing: Recover any orphan upload files from disk into DB
         syncOrphanedDiskFiles();
 
@@ -102,27 +99,6 @@ function initTables() {
     });
 }
 
-function backfillFileData(filepath) {
-    if (!filepath) return;
-    const diskPath = path.join(__dirname, "uploads", filepath);
-    if (fs.existsSync(diskPath)) {
-        try {
-            const buffer = fs.readFileSync(diskPath);
-            // Store binary BLOB in SQLite for auto-healing persistence (up to 50MB)
-            if (buffer.length <= 50 * 1024 * 1024) {
-                db.run(
-                    "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
-                    [buffer, buffer.length, filepath]
-                );
-            } else {
-                db.run("UPDATE students SET file_size = ? WHERE filepath = ?", [buffer.length, filepath]);
-            }
-        } catch (e) {
-            console.warn("Backfill file_data failed for:", filepath, e.message);
-        }
-    }
-}
-
 function syncOrphanedDiskFiles() {
     const uploadDir = path.join(__dirname, "uploads");
     if (!fs.existsSync(uploadDir)) {
@@ -133,50 +109,22 @@ function syncOrphanedDiskFiles() {
     try {
         const filesOnDisk = fs.readdirSync(uploadDir).filter(f => f.toLowerCase().endsWith(".pdf"));
 
-        // Only SELECT lightweight metadata (exclude BLOBs to save memory)
+        // Only SELECT lightweight metadata
         db.all("SELECT id, filepath, filename FROM students", [], (err, rows) => {
             if (err || !rows) return;
 
             const registeredFilepaths = new Set(rows.map(r => r.filepath));
-
-            // Restore any disk files missing from disk but present in DB file_data BLOB
-            rows.forEach(r => {
-                if (r.filepath) {
-                    const diskPath = path.join(uploadDir, r.filepath);
-                    if (!fs.existsSync(diskPath)) {
-                        // Fetch BLOB on-demand only for this specific missing file
-                        db.get("SELECT file_data FROM students WHERE id = ?", [r.id], (bErr, bRow) => {
-                            if (!bErr && bRow && bRow.file_data) {
-                                try {
-                                    const buf = Buffer.isBuffer(bRow.file_data)
-                                        ? bRow.file_data
-                                        : Buffer.from(bRow.file_data, "base64");
-                                    fs.writeFileSync(diskPath, buf);
-                                    console.log(`⚡ Auto-restored missing disk file from database: ${r.filepath}`);
-                                } catch (e) {
-                                    console.warn("Failed auto-restoring disk file:", r.filepath, e.message);
-                                }
-                            }
-                        });
-                    }
-                }
-            });
-
             if (filesOnDisk.length === 0) return;
 
-            // Register any orphaned files on disk not found in database
+            // Register any orphaned files on disk not found in database (metadata only)
             filesOnDisk.forEach(filename => {
                 if (!registeredFilepaths.has(filename)) {
                     const fullPath = path.join(uploadDir, filename);
                     let fileSize = 0;
-                    let fileBuffer = null;
 
                     try {
                         const stat = fs.statSync(fullPath);
                         fileSize = stat.size;
-                        if (fileSize <= 50 * 1024 * 1024) {
-                            fileBuffer = fs.readFileSync(fullPath);
-                        }
                     } catch (e) {}
 
                     let originalName = filename;
@@ -187,8 +135,8 @@ function syncOrphanedDiskFiles() {
                     console.log(`📦 Auto-registering orphaned upload file into DB: ${filename}`);
                     db.run(
                         `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                        ["RECOVERED", "Recovered Document", "General", originalName, originalName, filename, fileSize, fileBuffer],
+                         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
+                        ["RECOVERED", "Recovered Document", "General", originalName, originalName, filename, fileSize],
                         (err) => {
                             if (err) {
                                 console.error("Failed to register orphaned file:", filename, err.message);

@@ -55,16 +55,17 @@ async function loadDocuments(isSilent = false) {
         }
     } catch (err) {
         console.error("Error loading documents:", err);
-        if (!isSilent && (!documentsData || documentsData.length === 0)) {
+        if (!documentsData || documentsData.length === 0) {
             const tbody = document.getElementById("adminTableBody");
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; color: var(--warning); padding: 30px;">
                             <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.8rem; margin-bottom: 8px;"></i><br>
-                            Connecting to portal server...<br>
-                            <button type="button" class="btn btn-outline btn-sm" style="margin-top: 10px;" onclick="loadDocuments()">
-                                <i class="fa-solid fa-arrows-rotate"></i> Retry Now
+                            <strong>Unable to connect to portal server</strong><br>
+                            <small style="color: var(--text-muted); display: inline-block; margin-top: 4px;">Ensure server is running at <code>http://localhost:3000</code></small><br>
+                            <button type="button" class="btn btn-outline btn-sm" style="margin-top: 12px;" onclick="loadDocuments()">
+                                <i class="fa-solid fa-arrows-rotate"></i> Retry Connection
                             </button>
                         </td>
                     </tr>
@@ -182,38 +183,50 @@ async function handleUploadSubmit(e) {
     formData.append("pdf", file);
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading PDF...`;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading 0%...`;
 
-    try {
-        const res = await fetch("/api/documents/upload", {
-            method: "POST",
-            headers: {
-                "Bypass-Tunnel-Reminder": "true"
-            },
-            body: formData
-        });
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/documents/upload", true);
+    xhr.setRequestHeader("Bypass-Tunnel-Reminder", "true");
 
-        if (res.status === 401) {
+    xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading ${percent}%...`;
+        }
+    };
+
+    xhr.onload = async () => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload Document`;
+
+        if (xhr.status === 401) {
             showToast("Session expired. Redirecting to login...", "error");
             setTimeout(() => { window.location.href = "login.html"; }, 1500);
             return;
         }
 
-        const data = await res.json();
-        if (data.success) {
-            showToast("Document uploaded successfully!", "success");
-            closeModal("uploadModal");
-            await loadDocuments();
-        } else {
-            showToast(data.message || "Upload failed.", "error");
+        try {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                showToast("Document uploaded successfully!", "success");
+                closeModal("uploadModal");
+                await loadDocuments();
+            } else {
+                showToast(data.message || "Upload failed.", "error");
+            }
+        } catch (e) {
+            showToast("Server error during file upload.", "error");
         }
-    } catch (err) {
-        console.error("Upload error:", err);
-        showToast("Server error during file upload.", "error");
-    } finally {
+    };
+
+    xhr.onerror = () => {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload Document`;
-    }
+        showToast("Server error during file upload.", "error");
+    };
+
+    xhr.send(formData);
 }
 
 // ================= Edit Metadata Modal Handlers =================
@@ -564,49 +577,61 @@ async function submitBulkUpload() {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading Folder...`;
     progressContainer.style.display = "block";
-    progressBar.style.width = "20%";
-    progressPercent.textContent = "20%";
-    progressStatus.textContent = `Uploading ${bulkFileQueue.length} files to server...`;
+    progressBar.style.width = "0%";
+    progressPercent.textContent = "0%";
+    progressStatus.textContent = `Uploading ${bulkFileQueue.length} file(s) to server...`;
 
-    try {
-        const res = await fetch("/api/documents/bulk-upload", {
-            method: "POST",
-            headers: {
-                "Bypass-Tunnel-Reminder": "true"
-            },
-            body: formData
-        });
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/documents/bulk-upload", true);
+    xhr.setRequestHeader("Bypass-Tunnel-Reminder", "true");
 
-        progressBar.style.width = "80%";
-        progressPercent.textContent = "80%";
+    xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressPercent.textContent = `${percent}%`;
+            progressStatus.textContent = `Transferring files (${percent}%)...`;
+        }
+    };
 
-        if (res.status === 401) {
+    xhr.onload = async () => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Start Folder Upload`;
+
+        if (xhr.status === 401) {
             showToast("Session expired. Please log in again.", "error");
             setTimeout(() => { window.location.href = "login.html"; }, 1500);
             return;
         }
 
-        const data = await res.json();
-        progressBar.style.width = "100%";
-        progressPercent.textContent = "100%";
+        try {
+            const data = JSON.parse(xhr.responseText);
+            progressBar.style.width = "100%";
+            progressPercent.textContent = "100%";
+            progressStatus.textContent = "Processing complete!";
 
-        if (data.success) {
-            showToast(data.message || `Uploaded ${data.successCount} files successfully!`, "success");
-            setTimeout(async () => {
-                closeModal("bulkUploadModal");
-                clearBulkQueue();
-                await loadDocuments();
-            }, 1000);
-        } else {
-            showToast(data.message || "Bulk upload failed.", "error");
+            if (data.success) {
+                showToast(data.message || `Uploaded ${data.successCount} files successfully!`, "success");
+                setTimeout(async () => {
+                    closeModal("bulkUploadModal");
+                    clearBulkQueue();
+                    await loadDocuments();
+                }, 1000);
+            } else {
+                showToast(data.message || "Bulk upload failed.", "error");
+            }
+        } catch (e) {
+            showToast("Server error during bulk folder upload.", "error");
         }
-    } catch (err) {
-        console.error("Bulk upload error:", err);
-        showToast("Server error during bulk folder upload.", "error");
-    } finally {
+    };
+
+    xhr.onerror = () => {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Start Folder Upload`;
-    }
+        showToast("Server error during bulk folder upload.", "error");
+    };
+
+    xhr.send(formData);
 }
 
 // Helper Functions
