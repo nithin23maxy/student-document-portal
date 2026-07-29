@@ -96,8 +96,8 @@ function backfillFileData(filepath) {
     if (fs.existsSync(diskPath)) {
         try {
             const buffer = fs.readFileSync(diskPath);
-            // Store binary BLOB in SQLite for auto-healing persistence (up to 30MB)
-            if (buffer.length <= 30 * 1024 * 1024) {
+            // Store binary BLOB in SQLite for auto-healing persistence (up to 50MB)
+            if (buffer.length <= 50 * 1024 * 1024) {
                 db.run(
                     "UPDATE students SET file_data = ?, file_size = ? WHERE filepath = ?",
                     [buffer, buffer.length, filepath]
@@ -120,7 +120,6 @@ function syncOrphanedDiskFiles() {
 
     try {
         const filesOnDisk = fs.readdirSync(uploadDir).filter(f => f.toLowerCase().endsWith(".pdf"));
-        if (filesOnDisk.length === 0) return;
 
         db.all("SELECT filepath, file_data, filename FROM students", [], (err, rows) => {
             if (err || !rows) return;
@@ -143,6 +142,8 @@ function syncOrphanedDiskFiles() {
                 }
             });
 
+            if (filesOnDisk.length === 0) return;
+
             // Register any orphaned files on disk not found in database
             filesOnDisk.forEach(filename => {
                 if (!registeredFilepaths.has(filename)) {
@@ -153,7 +154,7 @@ function syncOrphanedDiskFiles() {
                     try {
                         const stat = fs.statSync(fullPath);
                         fileSize = stat.size;
-                        if (fileSize <= 30 * 1024 * 1024) {
+                        if (fileSize <= 50 * 1024 * 1024) {
                             fileBuffer = fs.readFileSync(fullPath);
                         }
                     } catch (e) {}

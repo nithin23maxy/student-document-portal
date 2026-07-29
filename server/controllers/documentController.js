@@ -299,3 +299,148 @@ exports.deleteDocument = (req, res) => {
         });
     });
 };
+
+// ================= Helper: Extract USN & Title from Filename =================
+function parseFilenameDetails(originalName, defaultDept = "General") {
+    const baseName = path.parse(originalName).name.trim();
+    
+    // USN Regex patterns (e.g. 1MS21CS001, 1RV20IS045, 4NI18EC099)
+    const usnRegex = /\b([1-9][A-Z]{2}\d{2}[A-Z]{2,4}\d{3})\b/i;
+    const match = baseName.match(usnRegex);
+
+    let usn = "";
+    let doc_title = "";
+
+    if (match) {
+        usn = match[1].toUpperCase();
+        // Remove USN from basename to get title
+        let remaining = baseName.replace(match[0], "").replace(/^[\s_#-]+|[\s_#-]+$/g, "");
+        remaining = remaining.replace(/[_-]+/g, " ").trim();
+        doc_title = remaining || "Academic Document";
+    } else {
+        // Fallback: split by '_' or '-' or ' '
+        const parts = baseName.split(/[_#-]+/);
+        usn = parts[0].trim().toUpperCase().replace(/\s+/g, "");
+        if (parts.length > 1) {
+            doc_title = parts.slice(1).join(" ").trim();
+        } else {
+            doc_title = "Academic Document";
+        }
+    }
+
+    if (!usn || usn.length < 3) {
+        usn = baseName.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    }
+
+    return {
+        usn: usn,
+        name: `Student ${usn}`,
+        department: defaultDept,
+        doc_title: doc_title
+    };
+}
+
+// ================= Bulk Upload Student Documents (Folder Upload) =================
+exports.bulkUploadDocuments = async (req, res) => {
+    const files = req.files || (req.file ? [req.file] : []);
+
+    if (!files || files.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "No PDF files selected for bulk upload."
+        });
+    }
+
+    let parsedItems = [];
+    try {
+        if (req.body.items) {
+            parsedItems = typeof req.body.items === "string" ? JSON.parse(req.body.items) : req.body.items;
+        }
+    } catch (e) {}
+
+    const defaultDept = (req.body.defaultDepartment || "Computer Science").trim();
+
+    // Fetch existing students map for USN -> { name, department } lookup
+    db.all("SELECT UPPER(usn) as clean_usn, name, department FROM students", [], async (err, rows) => {
+        const studentMap = new Map();
+        if (!err && rows) {
+            rows.forEach(r => {
+                if (r.clean_usn && !studentMap.has(r.clean_usn)) {
+                    studentMap.set(r.clean_usn, { name: r.name, department: r.department });
+                }
+            });
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+        const results = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const originalName = file.originalname || "document.pdf";
+            
+            // Check if metadata override passed from client preview table
+            let itemMeta = Array.isArray(parsedItems) ? parsedItems.find(p => p.originalname === originalName || p.index === i) : null;
+            let autoMeta = parseFilenameDetails(originalName, defaultDept);
+
+            let cleanUsn = itemMeta && itemMeta.usn ? itemMeta.usn.trim().toUpperCase() : autoMeta.usn;
+            let cleanDept = itemMeta && itemMeta.department ? itemMeta.department.trim() : autoMeta.department;
+            let cleanTitle = itemMeta && itemMeta.doc_title ? itemMeta.doc_title.trim() : autoMeta.doc_title;
+            let cleanName = itemMeta && itemMeta.name ? itemMeta.name.trim() : autoMeta.name;
+
+            // If student USN already exists in database, keep existing student name and department
+            if (studentMap.has(cleanUsn)) {
+                const existing = studentMap.get(cleanUsn);
+                cleanName = existing.name;
+                cleanDept = existing.department;
+            }
+
+            const storedFilename = file.filename;
+            const fileSize = file.size || 0;
+
+            let fileBuffer = null;
+            if (file.path && fs.existsSync(file.path) && fileSize <= 50 * 1024 * 1024) {
+                try {
+                    fileBuffer = fs.readFileSync(file.path);
+                } catch (e) {}
+            }
+
+            await new Promise((resolve) => {
+                const insertQuery = fileBuffer
+                    ? `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+                    : `INSERT INTO students (usn, name, department, doc_title, filename, filepath, file_size, file_data)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`;
+
+                const params = fileBuffer
+                    ? [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize, fileBuffer]
+                    : [cleanUsn, cleanName, cleanDept, cleanTitle, originalName, storedFilename, fileSize];
+
+                db.run(insertQuery, params, function (dbErr) {
+                    if (dbErr) {
+                        console.error(`Bulk upload insert error for ${originalName}:`, dbErr.message);
+                        errorCount++;
+                        results.push({ filename: originalName, usn: cleanUsn, success: false, error: dbErr.message });
+                    } else {
+                        successCount++;
+                        studentMap.set(cleanUsn, { name: cleanName, department: cleanDept });
+                        results.push({ filename: originalName, usn: cleanUsn, title: cleanTitle, success: true, id: this.lastID });
+
+                        // Sync name and department for all documents with this USN
+                        db.run("UPDATE students SET name = ?, department = ? WHERE UPPER(usn) = ?", [cleanName, cleanDept, cleanUsn], () => {});
+                    }
+                    resolve();
+                });
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully processed ${successCount} document(s). ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
+            total: files.length,
+            successCount,
+            errorCount,
+            results
+        });
+    });
+};

@@ -44,14 +44,16 @@ app.get("/uploads/:filename", (req, res, next) => {
     const uploadDir = path.join(__dirname, "uploads");
     const filePath = path.join(uploadDir, filename);
 
+    res.setHeader("Content-Type", "application/pdf");
+
     if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
     }
 
     // If file is missing on disk, recover from SQLite database file_data BLOB fallback
     db.get(
-        "SELECT file_data, filename FROM students WHERE filepath = ? OR filename = ?",
-        [filename, filename],
+        "SELECT file_data, filename, filepath FROM students WHERE filepath = ? OR filename = ? OR filepath LIKE ?",
+        [filename, filename, `%${filename}`],
         (err, row) => {
             if (!err && row && row.file_data) {
                 try {
@@ -62,8 +64,10 @@ app.get("/uploads/:filename", (req, res, next) => {
                     if (!fs.existsSync(uploadDir)) {
                         fs.mkdirSync(uploadDir, { recursive: true });
                     }
-                    fs.writeFileSync(filePath, fileBuffer);
-                    console.log(`⚡ Restored missing disk file from database fallback: ${filename}`);
+                    
+                    const actualPath = path.join(uploadDir, row.filepath || filename);
+                    fs.writeFileSync(actualPath, fileBuffer);
+                    console.log(`⚡ Restored missing disk file from database fallback: ${row.filepath || filename}`);
 
                     res.setHeader("Content-Type", "application/pdf");
                     res.setHeader("Content-Disposition", `inline; filename="${row.filename || filename}"`);

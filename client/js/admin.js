@@ -335,6 +335,248 @@ async function handleLogout() {
     }
 }
 
+// ================= Bulk Folder & Multiple PDF Upload Logic =================
+let bulkFileQueue = [];
+
+function openBulkUploadModal() {
+    clearBulkQueue();
+    openModal("bulkUploadModal");
+    setupBulkDropZone();
+}
+
+function setupBulkDropZone() {
+    const dropZone = document.getElementById("bulkDropZone");
+    if (!dropZone || dropZone.dataset.setup) return;
+
+    dropZone.dataset.setup = "true";
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.background = '#e0e7ff';
+            dropZone.style.borderColor = 'var(--primary)';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.background = '#f8fafc';
+            dropZone.style.borderColor = 'var(--primary)';
+        }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+            processSelectedBulkFiles(Array.from(files));
+        }
+    }, false);
+}
+
+function handleBulkFilesSelected(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+        processSelectedBulkFiles(files);
+    }
+}
+
+function processSelectedBulkFiles(files) {
+    const pdfFiles = files.filter(f => f.name.toLowerCase().endsWith(".pdf"));
+
+    if (pdfFiles.length === 0) {
+        showToast("No PDF (.pdf) files found in selection.", "error");
+        return;
+    }
+
+    pdfFiles.forEach(file => {
+        const extracted = extractUsnAndTitle(file.name);
+        bulkFileQueue.push({
+            file: file,
+            originalname: file.name,
+            usn: extracted.usn,
+            doc_title: extracted.title
+        });
+    });
+
+    renderBulkPreviewTable();
+}
+
+function extractUsnAndTitle(filename) {
+    const baseName = filename.replace(/\.[^/.]+$/, "").trim();
+    const usnRegex = /\b([1-9][A-Za-z]{2}\d{2}[A-Za-z]{2,4}\d{3})\b/i;
+    const match = baseName.match(usnRegex);
+
+    let usn = "";
+    let title = "";
+
+    if (match) {
+        usn = match[1].toUpperCase();
+        let remaining = baseName.replace(match[0], "").replace(/^[\s_#-]+|[\s_#-]+$/g, "");
+        title = remaining.replace(/[_-]+/g, " ").trim() || "Academic Document";
+    } else {
+        const parts = baseName.split(/[_#-]+/);
+        usn = parts[0].trim().toUpperCase().replace(/\s+/g, "");
+        title = parts.length > 1 ? parts.slice(1).join(" ").trim() : "Academic Document";
+    }
+
+    if (!usn || usn.length < 3) {
+        usn = baseName.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    }
+
+    return { usn, title };
+}
+
+function renderBulkPreviewTable() {
+    const previewSection = document.getElementById("bulkPreviewSection");
+    const tbody = document.getElementById("bulkPreviewTableBody");
+    const submitBtn = document.getElementById("bulkSubmitBtn");
+    const heading = document.getElementById("bulkPreviewHeading");
+
+    if (bulkFileQueue.length === 0) {
+        previewSection.style.display = "none";
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Start Folder Upload`;
+        return;
+    }
+
+    previewSection.style.display = "block";
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Upload ${bulkFileQueue.length} Document(s)`;
+    heading.innerHTML = `<i class="fa-solid fa-list-check" style="color: var(--primary);"></i> Detected ${bulkFileQueue.length} PDF File(s) & Auto-Extracted USNs`;
+
+    let rows = "";
+    bulkFileQueue.forEach((item, index) => {
+        rows += `
+            <tr>
+                <td><strong>${index + 1}</strong></td>
+                <td style="word-break: break-all;"><i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> ${escapeHtml(item.originalname)}</td>
+                <td>
+                    <input type="text" class="form-control form-control-sm" value="${escapeHtml(item.usn)}" onchange="updateBulkItemUsn(${index}, this.value)" style="font-weight:700; text-transform:uppercase;">
+                </td>
+                <td>
+                    <input type="text" class="form-control form-control-sm" value="${escapeHtml(item.doc_title)}" onchange="updateBulkItemTitle(${index}, this.value)">
+                </td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeBulkItem(${index})" title="Remove from queue">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = rows;
+}
+
+function updateBulkItemUsn(index, val) {
+    if (bulkFileQueue[index]) {
+        bulkFileQueue[index].usn = val.trim().toUpperCase();
+    }
+}
+
+function updateBulkItemTitle(index, val) {
+    if (bulkFileQueue[index]) {
+        bulkFileQueue[index].doc_title = val.trim();
+    }
+}
+
+function removeBulkItem(index) {
+    bulkFileQueue.splice(index, 1);
+    renderBulkPreviewTable();
+}
+
+function clearBulkQueue() {
+    bulkFileQueue = [];
+    document.getElementById("bulkFolderInput").value = "";
+    document.getElementById("bulkFilesInput").value = "";
+    document.getElementById("bulkProgressContainer").style.display = "none";
+    renderBulkPreviewTable();
+}
+
+async function submitBulkUpload() {
+    if (bulkFileQueue.length === 0) return;
+
+    const defaultDept = document.getElementById("bulkDefaultDept").value.trim() || "Computer Science";
+    const submitBtn = document.getElementById("bulkSubmitBtn");
+    const progressContainer = document.getElementById("bulkProgressContainer");
+    const progressBar = document.getElementById("bulkProgressBar");
+    const progressPercent = document.getElementById("bulkProgressPercent");
+    const progressStatus = document.getElementById("bulkProgressStatus");
+
+    const formData = new FormData();
+    formData.append("defaultDepartment", defaultDept);
+
+    const itemsMeta = bulkFileQueue.map((item, index) => ({
+        index: index,
+        originalname: item.originalname,
+        usn: item.usn,
+        doc_title: item.doc_title,
+        department: defaultDept
+    }));
+
+    formData.append("items", JSON.stringify(itemsMeta));
+
+    bulkFileQueue.forEach((item) => {
+        formData.append("pdfs", item.file);
+    });
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Uploading Folder...`;
+    progressContainer.style.display = "block";
+    progressBar.style.width = "20%";
+    progressPercent.textContent = "20%";
+    progressStatus.textContent = `Uploading ${bulkFileQueue.length} files to server...`;
+
+    try {
+        const res = await fetch("/api/documents/bulk-upload", {
+            method: "POST",
+            headers: {
+                "Bypass-Tunnel-Reminder": "true"
+            },
+            body: formData
+        });
+
+        progressBar.style.width = "80%";
+        progressPercent.textContent = "80%";
+
+        if (res.status === 401) {
+            showToast("Session expired. Please log in again.", "error");
+            setTimeout(() => { window.location.href = "login.html"; }, 1500);
+            return;
+        }
+
+        const data = await res.json();
+        progressBar.style.width = "100%";
+        progressPercent.textContent = "100%";
+
+        if (data.success) {
+            showToast(data.message || `Uploaded ${data.successCount} files successfully!`, "success");
+            setTimeout(async () => {
+                closeModal("bulkUploadModal");
+                clearBulkQueue();
+                await loadDocuments();
+            }, 1000);
+        } else {
+            showToast(data.message || "Bulk upload failed.", "error");
+        }
+    } catch (err) {
+        console.error("Bulk upload error:", err);
+        showToast("Server error during bulk folder upload.", "error");
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fa-solid fa-upload"></i> Start Folder Upload`;
+    }
+}
+
 // Helper Functions
 function openModal(id) {
     document.getElementById(id).classList.add("active");

@@ -40,11 +40,16 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 16px;">
                 <div>
                     <h1 style="font-size: 1.8rem;">Document Management Dashboard</h1>
-                    <p style="color: var(--text-muted); font-size: 0.95rem;">Add, update, rename, replace, or remove student PDF files</p>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Add, update, bulk upload folders, or remove student PDF files</p>
                 </div>
-                <button type="button" class="btn btn-primary" onclick="openUploadModal()">
-                    <i class="fa-solid fa-plus"></i> Upload New PDF
-                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-primary" onclick="openBulkUploadModal()">
+                        <i class="fa-solid fa-folder-plus"></i> Bulk / Folder Upload
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="openUploadModal()">
+                        <i class="fa-solid fa-plus"></i> Upload Single PDF
+                    </button>
+                </div>
             </div>
 
             <!-- Stats Widgets Grid -->
@@ -156,7 +161,89 @@
         </div>
     </div>
 
-    <!-- ================= Edit / Rename Metadata Modal ================= -->
+    <!-- ================= Bulk Folder / Multiple PDF Upload Modal ================= -->
+    <div id="bulkUploadModal" class="modal-backdrop">
+        <div class="modal" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-folder-plus" style="color: var(--primary);"></i> Bulk Folder & PDF Upload (Auto USN Extraction)</h3>
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('bulkUploadModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+                    Select an entire folder or multiple PDF files named with student USNs (e.g. <code>1MS21CS001.pdf</code>, <code>1MS21CS002_Marksheet.pdf</code>). The system automatically extracts USNs and document titles.
+                </p>
+
+                <!-- Action Buttons / Drop Zone -->
+                <div id="bulkDropZone" style="border: 2px dashed var(--primary); background: #f8fafc; border-radius: var(--radius-lg); padding: 24px; text-align: center; margin-bottom: 20px; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-folder-open" style="font-size: 2.8rem; color: var(--primary); margin-bottom: 10px;"></i>
+                    <h4 style="margin-bottom: 6px; font-size: 1.1rem; color: #0f172a;">Select Folder or Drag & Drop PDFs Here</h4>
+                    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">Upload a directory containing many student files at once</p>
+                    
+                    <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('bulkFolderInput').click()">
+                            <i class="fa-solid fa-folder-open"></i> Select Student Folder
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('bulkFilesInput').click()">
+                            <i class="fa-solid fa-file-pdf"></i> Select Multiple PDF Files
+                        </button>
+                    </div>
+
+                    <input type="file" id="bulkFolderInput" webkitdirectory directory multiple accept="application/pdf,.pdf" style="display:none;" onchange="handleBulkFilesSelected(event)">
+                    <input type="file" id="bulkFilesInput" multiple accept="application/pdf,.pdf" style="display:none;" onchange="handleBulkFilesSelected(event)">
+                </div>
+
+                <div class="form-group" style="max-width: 350px;">
+                    <label class="form-label" for="bulkDefaultDept">Default Department / Course for New Students *</label>
+                    <input type="text" id="bulkDefaultDept" class="form-control" value="Computer Science" placeholder="e.g. Computer Science" required>
+                </div>
+
+                <!-- Live Extraction Preview Table -->
+                <div id="bulkPreviewSection" style="display: none; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="font-size: 1rem; color: #0f172a;" id="bulkPreviewHeading">
+                            <i class="fa-solid fa-list-check" style="color: var(--primary);"></i> Detected PDF Files & Auto-Extracted USNs
+                        </h4>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="clearBulkQueue()" style="color: var(--danger); border-color: #fca5a5;">
+                            <i class="fa-solid fa-trash"></i> Clear Selection
+                        </button>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <table style="font-size: 0.88rem;">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Original File Name</th>
+                                    <th>Extracted USN *</th>
+                                    <th>Document Title</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulkPreviewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="bulkProgressContainer" style="display: none; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 600; margin-bottom: 6px; color: var(--text-main);">
+                        <span id="bulkProgressStatus">Uploading files...</span>
+                        <span id="bulkProgressPercent">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden;">
+                        <div id="bulkProgressBar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('bulkUploadModal')">Cancel</button>
+                <button type="button" id="bulkSubmitBtn" class="btn btn-primary" onclick="submitBulkUpload()" disabled>
+                    <i class="fa-solid fa-upload"></i> Start Folder Upload
+                </button>
+            </div>
+        </div>
+    </div>
     <div id="editModal" class="modal-backdrop">
         <div class="modal">
             <div class="modal-header">

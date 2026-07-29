@@ -32,6 +32,13 @@ router.post(
     documentController.uploadDocument
 );
 
+router.post(
+    "/bulk-upload",
+    requireAuth,
+    handleUploadMiddleware,
+    documentController.bulkUploadDocuments
+);
+
 router.put(
     "/update/:id",
     requireAuth,
